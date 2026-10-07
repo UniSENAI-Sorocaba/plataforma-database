@@ -1,0 +1,14 @@
+DB-001 - Evidencia de Seguranca
+
+Validacao realizada no PostgreSQL:
+
+1. O role PUBLIC nao possui USAGE nos schemas de dominio.
+2. O role PUBLIC nao possui CREATE nos schemas de dominio.
+3. O usuario plataforma e o proprietario dos schemas no ambiente de validacao.
+4. O usuario plataforma possui USAGE e CREATE nos schemas no ambiente de validacao.
+
+Resultado:
+
+Os schemas de dominio nao estao expostos para uso ou criacao de objetos pelo role PUBLIC.
+
+A definicao de roles e permissoes especificas de aplicacao nao foi implementada na DB-001, pois a definicao de papeis/permissoes pertence a entrega DB-006.
