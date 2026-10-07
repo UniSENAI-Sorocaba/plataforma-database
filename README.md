@@ -23,7 +23,7 @@ make validate
 make down
 ```
 
-O `make validate` aplica todas as migrations em uma instância PostgreSQL 16 limpa e confirma os schemas esperados.
+O `make validate` verifica a existência dos schemas de domínio esperados no PostgreSQL e confirma a estrutura básica definida pela DB-001.
 
 ## Pendência de governança
 
