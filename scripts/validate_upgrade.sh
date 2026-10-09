@@ -9,7 +9,9 @@ echo "=== [validate_upgrade] Iniciando validacao de upgrade incremental ==="
 # 1. Cria um banco de dados limpo para o teste de upgrade
 echo "1. Provisionando banco isolado para upgrade: $UPGRADE_DB..."
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d postgres -c \
-  "DROP DATABASE IF EXISTS $UPGRADE_DB; CREATE DATABASE $UPGRADE_DB OWNER $DB_USER;"
+  "DROP DATABASE IF EXISTS $UPGRADE_DB WITH (FORCE);"
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d postgres -c \
+  "CREATE DATABASE $UPGRADE_DB OWNER $DB_USER;"
 
 # 2. Aplica apenas a migration baseline (V0001)
 echo "2. Aplicando migration baseline (V0001)..."
@@ -44,6 +46,6 @@ PGDATABASE="$UPGRADE_DB" ./scripts/validate.sh
 # 9. Limpa o banco de teste de upgrade
 echo "9. Limpando banco temporario de upgrade..."
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d postgres -c \
-  "DROP DATABASE IF EXISTS $UPGRADE_DB;"
+  "DROP DATABASE IF EXISTS $UPGRADE_DB WITH (FORCE);"
 
 echo "=== [validate_upgrade] Validacao de upgrade e compatibilidade concluida com sucesso! ==="
