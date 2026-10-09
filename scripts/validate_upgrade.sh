@@ -31,21 +31,25 @@ echo "5. Verificando que V0002 foi aplicada no upgrade..."
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$UPGRADE_DB" -Atc \
   "SELECT count(*) FROM public.schema_migration WHERE version = 'V0002';" | grep -qx '1'
 
-# 6. Valida idempotencia: reexecuta migrate.sh no banco atualizado
-echo "6. Testando idempotencia (reexecutando migrate.sh no banco atualizado)..."
+# 6. Valida idempotencia de migrations: reexecuta migrate.sh no banco atualizado
+echo "6. Testando idempotencia de migrations (reexecutando migrate.sh no banco atualizado)..."
 PGDATABASE="$UPGRADE_DB" ./scripts/migrate.sh
 
-# 7. Aplica seeds no banco atualizado
+# 7. Aplica seeds deterministicos no banco atualizado
 echo "7. Aplicando seeds deterministicos no banco atualizado..."
 PGDATABASE="$UPGRADE_DB" ./scripts/seed.sh
 
-# 8. Executa suite completa de validacao
-echo "8. Executando suite completa de validacao no banco atualizado..."
+# 8. Valida idempotencia de seeds: reexecuta seed.sh no banco atualizado
+echo "8. Testando idempotencia de seeds (reexecutando seed.sh no banco atualizado)..."
+PGDATABASE="$UPGRADE_DB" ./scripts/seed.sh
+
+# 9. Executa suite completa de validacao
+echo "9. Executando suite completa de validacao no banco atualizado..."
 PGDATABASE="$UPGRADE_DB" ./scripts/validate.sh
 
-# 9. Limpa o banco de teste de upgrade
-echo "9. Limpando banco temporario de upgrade..."
+# 10. Limpa o banco de teste de upgrade
+echo "10. Limpando banco temporario de upgrade..."
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d postgres -c \
   "DROP DATABASE IF EXISTS $UPGRADE_DB WITH (FORCE);"
 
-echo "=== [validate_upgrade] Validacao de upgrade e compatibilidade concluida com sucesso! ==="
+echo "=== [validate_upgrade] Validacao de upgrade, compatibilidade e idempotencia de seeds concluida com sucesso! ==="
