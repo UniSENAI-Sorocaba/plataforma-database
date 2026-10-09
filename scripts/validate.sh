@@ -36,22 +36,23 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NA
 
 echo "[validate] 7. Validando postura de seguranca (sem USAGE/CREATE para PUBLIC)..."
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
-  "SELECT count(*) FROM information_schema.schema_privileges WHERE table_schema IN ('auth','academic_pi','extension','assets','institutional') AND grantee = 'PUBLIC' AND privilege_type IN ('USAGE', 'CREATE');" \
+  "SELECT count(*) FROM information_schema.schemata WHERE schema_name IN ('auth','academic_pi','extension','assets','institutional') AND (has_schema_privilege('public', schema_name, 'USAGE') OR has_schema_privilege('public', schema_name, 'CREATE'));" \
   | grep -qx '0'
 
 echo "[validate] 8. Validando integridade e funcionamento de constraints..."
-docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -c \
-  "DO \$\$
-   BEGIN
-     BEGIN
-       INSERT INTO public.audit_event (id, schema_name, table_name, operation)
-       VALUES ('ffffffff-ffff-ffff-ffff-ffffffffffff', 'test', 'test', 'INVALID_OP');
-       RAISE EXCEPTION 'Constraint check failed to reject invalid operation';
-     EXCEPTION
-       WHEN check_violation THEN
-         -- Comportamento esperado: constraint bloqueou operacao invalida com sucesso
-         NULL;
-     END;
-   END \$\$;"
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" <<'EOF'
+DO $$
+BEGIN
+  BEGIN
+    INSERT INTO public.audit_event (id, schema_name, table_name, operation)
+    VALUES ('ffffffff-ffff-ffff-ffff-ffffffffffff', 'test', 'test', 'INVALID_OP');
+    RAISE EXCEPTION 'Constraint check failed to reject invalid operation';
+  EXCEPTION
+    WHEN check_violation THEN
+      -- Comportamento esperado: constraint bloqueou operacao invalida com sucesso
+      NULL;
+  END;
+END $$;
+EOF
 
 echo "[validate] Todas as validacoes de compatibilidade e integridade foram concluidas com sucesso!"
