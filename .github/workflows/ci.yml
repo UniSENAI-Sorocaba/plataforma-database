@@ -1,0 +1,39 @@
+name: CI Database
+
+on:
+  push:
+    branches:
+      - main
+      - '**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  validate-database:
+    name: Sobe banco limpo, aplica migrations e valida compatibilidade
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositorio
+        uses: actions/checkout@v4
+
+      - name: Sobe banco limpo (PostgreSQL 16)
+        run: make up
+
+      - name: Clean Install - Aplica migrations
+        run: make migrate
+
+      - name: Clean Install - Aplica seeds deterministicos
+        run: make seed
+
+      - name: Clean Install - Valida compatibilidade e integridade
+        run: make validate
+
+      - name: Upgrade Validation - Executa teste de upgrade e compatibilidade
+        run: make validate-upgrade
+
+      - name: Finaliza servico de banco de dados
+        if: always()
+        run: make down
