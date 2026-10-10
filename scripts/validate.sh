@@ -55,4 +55,28 @@ BEGIN
 END $$;
 EOF
 
-echo "[validate] Todas as validacoes de compatibilidade e integridade foram concluidas com sucesso!"
+echo "[validate] 9. Validando presenca e cobertura de seeds deterministicos..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT (count(*) >= 15)::text FROM public.audit_event;" \
+  | grep -qx 'true'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(DISTINCT schema_name, ',' ORDER BY schema_name) FROM public.audit_event WHERE schema_name IN ('academic_pi','assets','auth','extension','institutional');" \
+  | grep -qx 'academic_pi,assets,auth,extension,institutional'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(DISTINCT operation, ',' ORDER BY operation) FROM public.audit_event WHERE operation IN ('DELETE','INSERT','UPDATE');" \
+  | grep -qx 'DELETE,INSERT,UPDATE'
+
+echo "[validate] 10. Validando determinismo e conformidade Anti-PII (sem dados pessoais)..."
+# Garante que nenhum identificador utilize padroes aleatorios fora da faixa reservada
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM public.audit_event WHERE id::text NOT LIKE '00000000-0000-4000-8000-%';" \
+  | grep -qx '0'
+
+# Garante ausencia total de emails reais ou padroes de identificacao pessoal (LGPD)
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM public.audit_event WHERE (old_data::text ~* '(@gmail|@hotmail|@outlook|@yahoo|@senai|@unisenai|[0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2})') OR (new_data::text ~* '(@gmail|@hotmail|@outlook|@yahoo|@senai|@unisenai|[0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2})');" \
+  | grep -qx '0'
+
+echo "[validate] Todas as validacoes de compatibilidade, integridade e seeds concluidas com sucesso!"
