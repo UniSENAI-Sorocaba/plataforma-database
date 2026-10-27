@@ -59,10 +59,12 @@ O comando `make validate-upgrade` valida a migração incremental a partir do es
 - [DB-001: Convenções e Padrões de Arquitetura de Banco](docs/DB-001-conventions.md)
 - [DB-002: Integração Contínua e Validação de Compatibilidade](docs/DB-002-ci.md)
 - [DB-003: Seeds Sintéticos Determinísticos e Anti-PII](docs/DB-003-seeds.md)
+- [DB-004: Identidade, Usuário e Vínculo Acadêmico](docs/DB-004-identity-user-link.md)
 - [Diretrizes e Catálogo de Seeds](seeds/README.md)
 - [Evidência DB-001: Segurança e Privilégios](evidence/DB-001-security.txt)
 - [Evidência DB-002: Validação de CI, Instalação Limpa e Upgrade](evidence/DB-002-ci-validation.md)
 - [Evidência DB-003: Seeds Sintéticos Determinísticos e sem Dados Pessoais](evidence/DB-003-synthetic-seeds.md)
+- [Evidência DB-004: Identidade, Usuário e Vínculo com Constraints e Migration Testada](evidence/DB-004-identity-user-link.md)
 
 ## Pendência de governança
 
