@@ -39,6 +39,16 @@ Para assegurar clareza, rastreabilidade e evitar colisões entre entidades, os s
   - `institutional`: Cadastro de unidade de campus, ajuste de capacidade e arquivamento de aviso (`INSERT`, `UPDATE`, `DELETE`).
 - **Operações Cobertas:** `INSERT`, `UPDATE` e `DELETE`.
 
+### `0002_identity_user_link.sql`
+- **Tabelas Alvo:** `auth.user`, `auth.user_identity`, `institutional.academic_class`, `institutional.academic_link`
+- **Migration Mínima Exigida:** `V0003__create_identity_user_and_academic_link.sql`
+- **Cobertura de Domínios e Cenários:**
+  - `auth.user`: Usuários sintéticos determinísticos com status `active` e `pending` (cenário de importação CSV aguardando ativação), além de usuário desvinculado (sem turmas associadas).
+  - `auth.user_identity`: Identidades OIDC institucionais federadas mapeadas para contas de usuário.
+  - `institutional.academic_class`: Turmas acadêmicas com código, nome e termo letivo (`2026.1`).
+  - `institutional.academic_link`: Vínculos com papéis de `student`, `professor` e `coordinator`, cobrindo cenários de estudante em múltiplas turmas e status de vínculo inativo/desativado.
+- **Conformidade Anti-PII:** CPFs e e-mails 100% fictícios (`@synthetic.local`), sem uso de dados reais (LGPD).
+
 ---
 
 ## 4. Execução e Validação
