@@ -22,7 +22,9 @@ Para assegurar clareza, rastreabilidade e evitar colisões entre entidades, os s
 | :--- | :--- | :--- |
 | **Identificador do Evento (PK)** | `00000000-0000-4000-8000-0000000000XX` | `00000000-0000-4000-8000-000000000001` |
 | **Ator do Sistema (Actor ID)** | `a0000000-0000-4000-8000-0000000000XX` | `a0000000-0000-4000-8000-000000000001` |
-| **Registro Afetado (Record ID)** | `b0000000-0000-4000-8000-0000000000XX` | `b0000000-0000-4000-8000-000000000001` |
+| **Registro Afetado / Usuário (Record ID)** | `b0000000-0000-4000-8000-0000000000XX` | `b0000000-0000-4000-8000-000000000001` |
+| **Sessão / Token (Session ID)** | `c0000000-0000-4000-8000-0000000000XX` | `c0000000-0000-4000-8000-000000000001` |
+| **Família de Rotação (Family ID)** | `d0000000-0000-4000-8000-0000000000XX` | `d0000000-0000-4000-8000-000000000001` |
 
 ---
 
@@ -48,6 +50,17 @@ Para assegurar clareza, rastreabilidade e evitar colisões entre entidades, os s
   - `institutional.academic_class`: Turmas acadêmicas com código, nome e termo letivo (`2026.1`).
   - `institutional.academic_link`: Vínculos com papéis de `student`, `professor` e `coordinator`, cobrindo cenários de estudante em múltiplas turmas e status de vínculo inativo/desativado.
 - **Conformidade Anti-PII:** CPFs e e-mails 100% fictícios (`@synthetic.local`), sem uso de dados reais (LGPD).
+
+### `0003_user_session.sql`
+- **Tabela Alvo:** `auth.user_session`
+- **Migration Mínima Exigida:** `V0004__create_user_session.sql`
+- **Cobertura de Domínios e Cenários:**
+  - Sessão ativa válida de estudante com hash SHA-256 e sem revogação.
+  - Sessão rotacionada e superada por token subsequente (`replaced_by_token_id`).
+  - Sessão revogada por logout explícito de docente (`revoked_at` preenchido).
+  - Sessão ativa de coordenador sem rotação.
+  - Sessão invalidada por detecção de tentativa de reuso de token.
+- **Conformidade Anti-PII:** Tokens em formato hash SHA-256 (64 hex chars), IPs de teste reservados (RFC 5737) e user-agents genéricos.
 
 ---
 

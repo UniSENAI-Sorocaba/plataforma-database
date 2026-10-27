@@ -16,8 +16,8 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NA
 
 echo "[validate] 3. Validando registro das migrations aplicadas..."
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
-  "SELECT string_agg(version, ',' ORDER BY version) FROM public.schema_migration WHERE version IN ('V0001', 'V0002', 'V0003');" \
-  | grep -qx 'V0001,V0002,V0003'
+  "SELECT string_agg(version, ',' ORDER BY version) FROM public.schema_migration WHERE version IN ('V0001', 'V0002', 'V0003', 'V0004');" \
+  | grep -qx 'V0001,V0002,V0003,V0004'
 
 echo "[validate] 4. Validando tabela public.audit_event..."
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
@@ -245,6 +245,95 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NA
 
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
   "SELECT count(*) FROM auth.user_identity WHERE email ~* '(@gmail|@hotmail|@outlook|@yahoo|@senai|@unisenai)'; " \
+  | grep -qx '0'
+
+echo "[validate] 18. Validando tabela auth.user_session (DB-005)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'auth' AND table_name = 'user_session';" \
+  | grep -qx '1'
+
+echo "[validate] 19. Validando constraints e foreign keys de auth.user_session..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid = 'auth.user_session'::regclass AND contype = 'c';" \
+  | grep -qx 'user_session_expires_at_ck,user_session_token_hash_ck'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid = 'auth.user_session'::regclass AND contype = 'f';" \
+  | grep -qx 'user_session_replaced_by_token_fk,user_session_user_fk'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid = 'auth.user_session'::regclass AND contype = 'u';" \
+  | grep -qx 'user_session_token_hash_unq'
+
+echo "[validate] 20. Validando indices de auth.user_session..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(indexname, ',' ORDER BY indexname) FROM pg_indexes WHERE schemaname = 'auth' AND tablename = 'user_session' AND indexname LIKE 'idx_%';" \
+  | grep -qx 'idx_user_session_active_lookup,idx_user_session_family_id,idx_user_session_user_id'
+
+echo "[validate] 21. Validando regras funcionais e de integridade em auth.user_session (DO block)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" <<'EOF'
+DO $$
+DECLARE
+  v_user_id uuid := 'f0000000-0000-4000-8000-000000000099';
+  v_session_id_1 uuid := 'f0000000-0000-4000-8000-000000000051';
+  v_session_id_2 uuid := 'f0000000-0000-4000-8000-000000000052';
+  v_family_id uuid := 'f0000000-0000-4000-8000-000000000061';
+BEGIN
+  -- Insere usuario de teste
+  INSERT INTO auth.user (id, email, full_name, status)
+  VALUES (v_user_id, 'test.session.user@synthetic.local', 'Session Test User', 'active');
+
+  -- Teste 1: Rejeicao de token_hash curto (< 64 caracteres)
+  BEGIN
+    INSERT INTO auth.user_session (id, user_id, token_hash, family_id, expires_at)
+    VALUES (v_session_id_1, v_user_id, 'hash_invalido_curto', v_family_id, now() + interval '7 days');
+    RAISE EXCEPTION 'Constraint user_session_token_hash_ck falhou ao permitir hash com tamanho incorreto';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  -- Teste 2: Rejeicao de expires_at anterior ou igual a created_at
+  BEGIN
+    INSERT INTO auth.user_session (id, user_id, token_hash, family_id, created_at, expires_at)
+    VALUES (v_session_id_1, v_user_id, repeat('a', 64), v_family_id, now(), now() - interval '1 hour');
+    RAISE EXCEPTION 'Constraint user_session_expires_at_ck falhou ao permitir expires_at anterior a created_at';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  -- Teste 3: Insercao de sessao valida
+  INSERT INTO auth.user_session (id, user_id, token_hash, family_id, expires_at)
+  VALUES (v_session_id_1, v_user_id, repeat('a', 64), v_family_id, now() + interval '7 days');
+
+  -- Teste 4: Rejeicao de duplicidade em token_hash
+  BEGIN
+    INSERT INTO auth.user_session (id, user_id, token_hash, family_id, expires_at)
+    VALUES (v_session_id_2, v_user_id, repeat('a', 64), v_family_id, now() + interval '7 days');
+    RAISE EXCEPTION 'Constraint user_session_token_hash_unq falhou ao permitir token_hash duplicado';
+  EXCEPTION WHEN unique_violation THEN NULL;
+  END;
+
+  -- Teste 5: Insercao de token rotacionado e vinculo em replaced_by_token_id
+  INSERT INTO auth.user_session (id, user_id, token_hash, family_id, expires_at)
+  VALUES (v_session_id_2, v_user_id, repeat('b', 64), v_family_id, now() + interval '7 days');
+
+  UPDATE auth.user_session
+  SET replaced_by_token_id = v_session_id_2, revoked_at = now()
+  WHERE id = v_session_id_1;
+
+  -- Teste 6: Exclusao em cascata ao remover usuario
+  DELETE FROM auth.user WHERE id = v_user_id;
+
+  IF EXISTS (SELECT 1 FROM auth.user_session WHERE id IN (v_session_id_1, v_session_id_2)) THEN
+    RAISE EXCEPTION 'ON DELETE CASCADE falhou ao nao remover sessoes do usuario excluido';
+  END IF;
+END $$;
+EOF
+
+echo "[validate] 22. Validando presenca de dados sinteticos em auth.user_session..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT (count(*) >= 5)::text FROM auth.user_session;" | grep -qx 'true'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM auth.user_session WHERE id::text NOT LIKE 'c0000000-0000-4000-8000-%';" \
   | grep -qx '0'
 
 echo "[validate] Todas as validacoes de compatibilidade, integridade, constraints e seeds concluidas com sucesso!"

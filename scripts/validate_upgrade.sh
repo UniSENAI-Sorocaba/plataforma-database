@@ -26,10 +26,10 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$UPGRA
 echo "4. Executando upgrade com migrate.sh..."
 PGDATABASE="$UPGRADE_DB" ./scripts/migrate.sh
 
-# 5. Verifica se V0002 e V0003 foram aplicadas com sucesso
-echo "5. Verificando que V0002 e V0003 foram aplicadas no upgrade..."
+# 5. Verifica se V0002, V0003 e V0004 foram aplicadas com sucesso
+echo "5. Verificando que V0002, V0003 e V0004 foram aplicadas no upgrade..."
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$UPGRADE_DB" -Atc \
-  "SELECT string_agg(version, ',' ORDER BY version) FROM public.schema_migration WHERE version IN ('V0002', 'V0003');" | grep -qx 'V0002,V0003'
+  "SELECT string_agg(version, ',' ORDER BY version) FROM public.schema_migration WHERE version IN ('V0002', 'V0003', 'V0004');" | grep -qx 'V0002,V0003,V0004'
 
 # 6. Valida idempotencia de migrations: reexecuta migrate.sh no banco atualizado
 echo "6. Testando idempotencia de migrations (reexecutando migrate.sh no banco atualizado)..."
