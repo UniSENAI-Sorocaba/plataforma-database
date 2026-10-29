@@ -1,0 +1,36 @@
+DB-008 - Evidencia de Integridade (Propostas, Equipes e Solicitacoes)
+
+Validacao realizada no PostgreSQL 16 (ambiente local via Docker Compose):
+
+1. A migration V0008 foi aplicada com sucesso e criou academic_pi.project, academic_pi.enrollment_period, academic_pi.project_instructor e academic_pi.project_participation, mais 5 indices.
+2. A migration foi executada uma segunda vez sem erro (idempotencia: NOTICE already exists, skipping e INSERT 0 0).
+3. Foi executado um script de testes de integridade com 12 cenarios, todos com o resultado esperado:
+   - T01 projetos validos aceitos
+   - T02 project_category_ck barrou projeto sem categoria
+   - T03 project_title_ck barrou titulo vazio
+   - T04 project_participation_project_fk barrou projeto inexistente
+   - T05 FK composta barrou categorias divergentes do projeto
+   - T06 participacao valida em PI aceita
+   - T07 indice parcial idx_project_participation_student_active_pi barrou segundo PI ativo
+   - T08 1 PI + 1 Extensao permitido
+   - T09 projeto PI+Extensao barrado quando as duas vagas estao ocupadas
+   - T10 project_participation_justification_ck barrou remocao sem justificativa
+   - T11 remocao com justificativa aceita
+   - T12 ON DELETE RESTRICT protegeu projeto com participacao
+4. Os dados de teste foram removidos ao final.
+
+Resultado:
+
+Integridade referencial, limite de 1 PI + 1 Extensao por estudante (incluindo projeto classificado nas duas categorias), justificativa obrigatoria na remocao e protecao contra exclusao funcionam no banco. Como o limite esta em indice unico parcial, solicitacoes concorrentes sao decididas pelo proprio banco.
+
+Observacoes:
+
+- O ambiente de validacao tinha a V0003 (DB-004) aplicada localmente, ainda nao mergeada. A V0008 nao depende dela.
+- Estrategia de rollback: a migration so cria objetos; correcoes por roll-forward e backup antes de operacao destrutiva (DB-001).
+
+Pendencias:
+
+- FKs de student_id e instructor_id para auth.user apos o merge da DB-004.
+- Regra de pelo menos um docente por projeto fica na aplicacao.
+- Teste manual de concorrencia com duas sessoes.
+- Cenarios da DB-008 no validate.sh e na validacao de upgrade,
