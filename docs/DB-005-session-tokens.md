@@ -20,7 +20,7 @@ A especificação de produto [SPEC-AUTH-002](https://github.com/UniSENAI-Sorocab
 | **Detecção de Reutilização (Reuse Detection)** | Se um refresh token já rotacionado (`revoked_at IS NOT NULL` e `replaced_by_token_id IS NOT NULL`) for apresentado para renovação, a aplicação consulta por `family_id` e invalida imediatamente todas as sessões daquela família. | **AC-AUTH-002-03**, **SPEC-AUTH-002** |
 | **Logout Centralizado e Revogação** | Campo `revoked_at timestamptz` (em UTC). Um valor não-nulo indica invalidação definitiva da sessão. Suporta tanto logout pontual quanto encerramento global de sessões do usuário. | **AC-AUTH-002-04**, **SPEC-AUTH-002** |
 | **Flexibilidade de Políticas de Expiração** | A duração exata (inatividade vs absoluta) não é fixada com valores hardcoded no banco; o schema apenas impõe a constraint de integridade temporal `expires_at > created_at`, mantendo o banco desacoplado das parametrizações dinâmicas da aplicação. | **SPEC-AUTH-002**, **PG-006** |
-| **Auditoria e Rastreabilidade** | Eventos de criação, rotação e encerramento de sessão são integrados à trilha de auditoria (`public.audit_event`), referenciando `schema_name = 'auth'`, `table_name = 'user_session'`, `record_id` e `actor_id`. | **ADR-011**, **SPEC-AUTH-004** |
+| **Auditoria e Rastreabilidade** | Sem trilha de auditoria de negócio (SPEC-AUTH-004, DB-007): `public.audit_event` não guarda snapshots e não deve receber eventos de sessão com valores de token ou de dados do usuário. | **ADR-011**, **SPEC-AUTH-004** |
 
 ---
 

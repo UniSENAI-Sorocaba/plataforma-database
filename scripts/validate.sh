@@ -67,6 +67,56 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NA
   "SELECT string_agg(DISTINCT operation, ',' ORDER BY operation) FROM public.audit_event WHERE operation IN ('DELETE','INSERT','UPDATE');" \
   | grep -qx 'DELETE,INSERT,UPDATE'
 
+echo "[validate] 9.1. Validando que audit_event nao persiste snapshots de valores (DB-007)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM pg_constraint WHERE conrelid = 'public.audit_event'::regclass AND conname = 'audit_event_no_snapshot_ck' AND contype = 'c';" \
+  | grep -qx '1'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM public.audit_event WHERE old_data IS NOT NULL OR new_data IS NOT NULL;" \
+  | grep -qx '0'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM public.schema_migration WHERE version = 'V0007';" \
+  | grep -qx '1'
+
+echo "[validate] 9.2. Validando que nenhuma rotina ou trigger alimenta audit_event (DB-007)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') AND p.prosrc ILIKE '%audit_event%';" \
+  | grep -qx '0'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM pg_trigger WHERE NOT tgisinternal AND tgrelid = 'public.audit_event'::regclass;" \
+  | grep -qx '0'
+
+echo "[validate] 9.3. Validando comportamento de audit_event sem snapshots (DB-007)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" <<'EOF'
+DO $$
+BEGIN
+  -- Evento tecnico sem snapshot e aceito
+  INSERT INTO public.audit_event (id, schema_name, table_name, operation)
+  VALUES ('ffffffff-0000-4000-8000-000000000007', 'auth', 'user_session', 'INSERT');
+
+  -- Snapshot de valor anterior e rejeitado
+  BEGIN
+    INSERT INTO public.audit_event (id, schema_name, table_name, operation, old_data)
+    VALUES ('ffffffff-0000-4000-8000-000000000008', 'academic_pi', 'grade', 'UPDATE', '{"value": 8}'::jsonb);
+    RAISE EXCEPTION 'audit_event_no_snapshot_ck falhou ao permitir old_data';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  -- Snapshot de valor novo e rejeitado
+  BEGIN
+    INSERT INTO public.audit_event (id, schema_name, table_name, operation, new_data)
+    VALUES ('ffffffff-0000-4000-8000-000000000009', 'extension', 'hours', 'UPDATE', '{"hours": 10}'::jsonb);
+    RAISE EXCEPTION 'audit_event_no_snapshot_ck falhou ao permitir new_data';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  DELETE FROM public.audit_event WHERE id = 'ffffffff-0000-4000-8000-000000000007';
+END $$;
+EOF
+
 echo "[validate] 10. Validando tabelas de identidade, usuario e vinculo (DB-004)..."
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
   "SELECT string_agg(table_schema || '.' || table_name, ',' ORDER BY table_schema, table_name) FROM information_schema.tables WHERE (table_schema = 'auth' AND table_name IN ('user', 'user_identity')) OR (table_schema = 'institutional' AND table_name IN ('academic_class', 'academic_link'));" \
