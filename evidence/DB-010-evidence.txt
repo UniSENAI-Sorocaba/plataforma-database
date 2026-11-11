@@ -1,0 +1,50 @@
+=== [DB-010] Evidencia de Validacao: Rubricas e Notas de PI ===
+Work ID: DB-010 (Issue #10)
+Migration: migrations/V0010__create_pi_rubric_and_evaluation.sql
+Documentacao: docs/DB-010-pi-rubric-and-evaluation.md
+Relatorio Completo: evidence/DB-010-pi-rubric-and-evaluation.md
+Script de Cenarios: evidence/DB-010-evidence-tests.sql
+
+[1] Objetos Verificados no PostgreSQL 16:
+- Tabelas: academic_pi.evaluation_criterion, academic_pi.project_evaluation, academic_pi.evaluation_criterion_score
+- Registro em public.schema_migration: V0010 ('create pi rubric and evaluation tables')
+- Ausencia de tabelas de banca/agendamento e de colunas de historico de notas: confirmado (0 tabelas/colunas)
+- Tipos de weight e score: numeric sem precisao/escala cristalizada (numeric_precision IS NULL, numeric_scale IS NULL)
+- Constraints UNIQUE:
+  * evaluation_criterion_id_project_unq (id, project_id)
+  * evaluation_criterion_project_name_unq (project_id, name)
+  * evaluation_criterion_score_eval_criterion_unq (evaluation_id, criterion_id)
+  * project_evaluation_id_project_unq (id, project_id)
+  * project_evaluation_triplet_unq (project_id, evaluator_user_id, evaluated_student_id)
+- Constraints CHECK:
+  * evaluation_criterion_name_ck: length(trim(name)) > 0
+  * evaluation_criterion_weight_positive_ck: weight > 0
+  * evaluation_criterion_score_correction_ck: (last_corrected_at IS NULL) = (last_corrected_by_instructor_id IS NULL)
+  * project_evaluation_assignment_ck: assigned_by_user_id IS NULL OR evaluation_date IS NOT NULL
+  * project_evaluation_correction_ck: (corrected_at IS NULL) = (corrected_by_instructor_id IS NULL)
+  * project_evaluation_distinct_actors_ck: evaluator_user_id <> evaluated_student_id
+  * project_evaluation_finalization_ck: (finalized_at IS NULL) = (finalized_by_instructor_id IS NULL)
+  * project_evaluation_reopen_ck: (reopened_at IS NULL) = (reopened_by_instructor_id IS NULL)
+- Constraints FOREIGN KEY (ON DELETE RESTRICT):
+  * evaluation_criterion_project_fk -> academic_pi.project(id)
+  * evaluation_criterion_defined_by_user_fk -> auth.user(id)
+  * evaluation_criterion_instructor_fk -> academic_pi.project_instructor(project_id, instructor_id)
+  * project_evaluation_project_fk -> academic_pi.project(id)
+  * project_evaluation_evaluator_user_fk -> auth.user(id)
+  * project_evaluation_evaluated_user_fk -> auth.user(id)
+  * project_evaluation_participation_fk -> academic_pi.project_participation(project_id, student_id)
+  * project_evaluation_assigned_by_user_fk -> auth.user(id)
+  * project_evaluation_finalized_by_instructor_fk -> academic_pi.project_instructor(project_id, instructor_id)
+  * project_evaluation_reopened_by_instructor_fk -> academic_pi.project_instructor(project_id, instructor_id)
+  * project_evaluation_corrected_by_instructor_fk -> academic_pi.project_instructor(project_id, instructor_id)
+  * evaluation_criterion_score_evaluation_fk -> academic_pi.project_evaluation(id, project_id)
+  * evaluation_criterion_score_criterion_fk -> academic_pi.evaluation_criterion(id, project_id)
+  * evaluation_criterion_score_corrected_by_instructor_fk -> academic_pi.project_instructor(project_id, instructor_id)
+
+[2] Validacao Funcional e de Upgrade (scripts/validate.sh passos 36-40 e scripts/validate_upgrade.sh):
+- [validate] 36. Validando tabelas e registro da migration de rubricas e avaliacoes de PI (DB-010)... OK
+- [validate] 37. Validando check, unique, foreign keys e precisao em aberto de rubricas e avaliacoes (DB-010)... OK
+- [validate] 38. Validando indices das tabelas de rubricas e avaliacoes (DB-010)... OK
+- [validate] 39. Validando regras funcionais de rubricas, avaliacoes e substituicao de nota sem historico (DO block)... OK
+- [validate] 40. Validando que a validacao nao deixou dados residuais nas tabelas de rubricas e avaliacoes (DB-010)... OK
+- [validate_upgrade] Verificando que V0002, V0003, V0004, V0006, V0007, V0008, V0010 e V0011 foram aplicadas no upgrade e sao idempotentes... OK
