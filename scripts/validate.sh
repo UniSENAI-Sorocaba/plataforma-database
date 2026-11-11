@@ -691,5 +691,171 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NA
   "SELECT (SELECT count(*) FROM assets.project_file) || ',' || (SELECT count(*) FROM assets.file_lifecycle_state);" \
   | grep -qx '0,0'
 
-echo "[validate] Todas as validacoes de compatibilidade, integridade, constraints e seeds concluidas com sucesso!"
+echo "[validate] 31. Validando tabelas e registro da migration de RBAC (DB-006)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(table_name, ',' ORDER BY table_name) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('roles', 'permissions', 'role_permissions', 'user_roles');" \
+  | grep -qx 'permissions,role_permissions,roles,user_roles'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM public.schema_migration WHERE version = 'V0006';" \
+  | grep -qx '1'
+
+echo "[validate] 32. Validando check, unique e foreign keys das tabelas de RBAC (DB-006)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid IN ('public.roles'::regclass, 'public.permissions'::regclass, 'public.user_roles'::regclass) AND contype = 'c';" \
+  | grep -qx 'permissions_action_ck,permissions_resource_ck,roles_name_ck,user_roles_scope_consistency_ck,user_roles_scope_id_ck,user_roles_scope_type_ck'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid IN ('public.roles'::regclass, 'public.permissions'::regclass, 'public.user_roles'::regclass) AND contype = 'u';" \
+  | grep -qx 'roles_name_key,uk_permissions_action_resource,uk_user_role_scope'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid = 'public.user_roles'::regclass AND contype = 'f' AND conname IN ('user_roles_assigned_by_fk', 'user_roles_user_fk');" \
+  | grep -qx 'user_roles_assigned_by_fk,user_roles_user_fk'
+
+echo "[validate] 33. Validando indices das tabelas de RBAC (DB-006)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(indexname, ',' ORDER BY indexname) FROM pg_indexes WHERE schemaname = 'public' AND tablename IN ('roles', 'permissions', 'role_permissions', 'user_roles') AND indexname LIKE 'idx_%';" \
+  | grep -qx 'idx_role_permissions_permission,idx_role_permissions_role,idx_user_roles_lookup,idx_user_roles_role_id'
+
+echo "[validate] 34. Validando regras funcionais, prevencao de duplicidade, suporte a escopo e acumulo de papeis em RBAC (DO block)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" <<'EOF'
+DO $$
+DECLARE
+  v_user_1 uuid := 'f6000000-0000-4000-8000-000000000001';
+  v_assigner uuid := 'f6000000-0000-4000-8000-000000000002';
+  v_role_coord int;
+  v_role_docente int;
+BEGIN
+  INSERT INTO auth."user" (id, email, full_name, status) VALUES
+    (v_user_1, 'db006.validate.user1@synthetic.local', 'DB006 Validate User One', 'active'),
+    (v_assigner, 'db006.validate.assigner@synthetic.local', 'DB006 Validate Assigner', 'active');
+
+  -- Garante que os papeis basicos existem para o teste
+  INSERT INTO roles (name, description) VALUES
+    ('COORDENACAO', 'Coordenacao'),
+    ('DOCENTE', 'Docente')
+  ON CONFLICT (name) DO NOTHING;
+
+  SELECT id INTO v_role_coord FROM roles WHERE name = 'COORDENACAO';
+  SELECT id INTO v_role_docente FROM roles WHERE name = 'DOCENTE';
+
+  -- Teste 1: Papel com nome vazio ou duplicado deve ser rejeitado
+  BEGIN
+    INSERT INTO roles (name, description) VALUES ('   ', 'Nome vazio');
+    RAISE EXCEPTION 'Constraint roles_name_ck falhou ao permitir nome de papel vazio';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  BEGIN
+    INSERT INTO roles (name, description) VALUES ('COORDENACAO', 'Duplicado');
+    RAISE EXCEPTION 'Constraint roles_name_key falhou ao permitir nome de papel duplicado';
+  EXCEPTION WHEN unique_violation THEN NULL;
+  END;
+
+  -- Teste 2: Permissao com acao/recurso vazio ou duplicado deve ser rejeitada
+  BEGIN
+    INSERT INTO permissions (action, resource) VALUES ('   ', 'PROJECT');
+    RAISE EXCEPTION 'Constraint permissions_action_ck falhou ao permitir acao vazia';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  BEGIN
+    INSERT INTO permissions (action, resource) VALUES ('CREATE', '   ');
+    RAISE EXCEPTION 'Constraint permissions_resource_ck falhou ao permitir recurso vazio';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  INSERT INTO permissions (action, resource, description)
+  VALUES ('TEST_ACTION_DB006', 'TEST_RESOURCE_DB006', 'Permissao temporaria de teste')
+  ON CONFLICT (action, resource) DO NOTHING;
+
+  BEGIN
+    INSERT INTO permissions (action, resource, description)
+    VALUES ('TEST_ACTION_DB006', 'TEST_RESOURCE_DB006', 'Duplicada');
+    RAISE EXCEPTION 'Constraint uk_permissions_action_resource falhou ao permitir permissao duplicada';
+  EXCEPTION WHEN unique_violation THEN NULL;
+  END;
+
+  -- Teste 3: Atribuicao de papel a usuario inexistente deve ser rejeitada
+  BEGIN
+    INSERT INTO user_roles (user_id, role_id, scope_type, scope_id)
+    VALUES ('f6000000-0000-4000-8000-000000000999', v_role_coord, 'GLOBAL', '*');
+    RAISE EXCEPTION 'Constraint user_roles_user_fk falhou ao permitir usuario inexistente';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  -- Teste 4: Escopo invalido ou inconsistente deve ser rejeitado
+  BEGIN
+    INSERT INTO user_roles (user_id, role_id, scope_type, scope_id)
+    VALUES (v_user_1, v_role_coord, 'ESCOPO_INVALIDO', '123');
+    RAISE EXCEPTION 'Constraint user_roles_scope_type_ck falhou ao permitir scope_type invalido';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  BEGIN
+    INSERT INTO user_roles (user_id, role_id, scope_type, scope_id)
+    VALUES (v_user_1, v_role_coord, 'GLOBAL', 'ID_NAO_CURINGA');
+    RAISE EXCEPTION 'Constraint user_roles_scope_consistency_ck falhou ao permitir GLOBAL com scope_id diferente de *';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  BEGIN
+    INSERT INTO user_roles (user_id, role_id, scope_type, scope_id)
+    VALUES (v_user_1, v_role_docente, 'PROJETO', '*');
+    RAISE EXCEPTION 'Constraint user_roles_scope_consistency_ck falhou ao permitir PROJETO com scope_id curinga *';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  -- Teste 5: Acumulo de papeis no mesmo usuario e suporte a escopos distintos (GLOBAL e PROJETO)
+  INSERT INTO user_roles (user_id, role_id, scope_type, scope_id, assigned_by)
+  VALUES
+    (v_user_1, v_role_coord, 'GLOBAL', '*', v_assigner),
+    (v_user_1, v_role_docente, 'PROJETO', 'proj-test-001', v_assigner),
+    (v_user_1, v_role_docente, 'PROJETO', 'proj-test-002', v_assigner);
+
+  -- Teste 6: Duplicidade de papel no mesmo escopo deve ser rejeitada (uk_user_role_scope)
+  BEGIN
+    INSERT INTO user_roles (user_id, role_id, scope_type, scope_id)
+    VALUES (v_user_1, v_role_docente, 'PROJETO', 'proj-test-001');
+    RAISE EXCEPTION 'Constraint uk_user_role_scope falhou ao permitir papel duplicado no mesmo escopo';
+  EXCEPTION WHEN unique_violation THEN NULL;
+  END;
+
+  -- Teste 7: Exclusao do atribuidor preserva o vinculo com assigned_by = NULL (ON DELETE SET NULL)
+  DELETE FROM auth."user" WHERE id = v_assigner;
+
+  IF (SELECT count(*) FROM user_roles WHERE user_id = v_user_1 AND assigned_by IS NULL) <> 3 THEN
+    RAISE EXCEPTION 'ON DELETE SET NULL em user_roles_assigned_by_fk nao preservou atribuicoes ao remover atribuidor';
+  END IF;
+
+  -- Teste 8: Exclusao do usuario titular remove suas atribuicoes em cascata (ON DELETE CASCADE)
+  DELETE FROM auth."user" WHERE id = v_user_1;
+
+  IF EXISTS (SELECT 1 FROM user_roles WHERE user_id = v_user_1) THEN
+    RAISE EXCEPTION 'ON DELETE CASCADE em user_roles_user_fk falhou ao nao remover atribuicoes do usuario excluido';
+  END IF;
+
+  -- Limpeza da permissao temporaria
+  DELETE FROM permissions WHERE action = 'TEST_ACTION_DB006' AND resource = 'TEST_RESOURCE_DB006';
+END $$;
+EOF
+
+echo "[validate] 35. Validando presenca e cobertura de seeds deterministicos em RBAC (DB-006)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT (count(*) >= 3)::text FROM roles;" | grep -qx 'true'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT (count(*) >= 7)::text FROM permissions;" | grep -qx 'true'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT (count(*) >= 7)::text FROM role_permissions;" | grep -qx 'true'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT (count(*) >= 7)::text FROM user_roles;" | grep -qx 'true'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(DISTINCT scope_type, ',' ORDER BY scope_type) FROM user_roles WHERE scope_type IN ('GLOBAL', 'PROJETO', 'TURMA');" \
+  | grep -qx 'GLOBAL,PROJETO,TURMA'
+
 echo "[validate] Todas as validacoes de compatibilidade, integridade, constraints e seeds concluidas com sucesso!"

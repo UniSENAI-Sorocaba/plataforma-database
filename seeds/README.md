@@ -62,6 +62,15 @@ Para assegurar clareza, rastreabilidade e evitar colisões entre entidades, os s
   - Sessão invalidada por detecção de tentativa de reuso de token.
 - **Conformidade Anti-PII:** Tokens em formato hash SHA-256 (64 hex chars), IPs de teste reservados (RFC 5737) e user-agents genéricos.
 
+### `0004_rbac_roles_and_scopes.sql`
+- **Tabelas Alvo:** `roles`, `permissions`, `role_permissions`, `user_roles`
+- **Migration Mínima Exigida:** `V0006__create_rbac_schema.sql` (depende de `V0003__create_identity_user_and_academic_link.sql` e `0002_identity_user_link.sql`)
+- **Cobertura de Domínios e Cenários:**
+  - `roles`: Papéis institucionais iniciais (`COORDENACAO`, `DOCENTE`, `ALUNO`) com timestamp constante.
+  - `permissions` e `role_permissions`: 7 permissões essenciais (`MANAGE/USER`, `MANAGE/ROLE`, `CREATE/PROJECT`, `MANAGE_MEMBERS/PROJECT`, `VALIDATE_HOURS/PROJECT`, `EVALUATE/PROJECT`, `SUBMIT/ACTIVITY`) associadas aos respectivos papéis.
+  - `user_roles`: 7 atribuições sintéticas vinculadas aos usuários determinísticos de `auth.user` (`b0000000-0000-4000-8000-000000000001` a `...0003`), cobrindo acúmulo de papéis na mesma conta (`COORDENACAO` global + `DOCENTE` em projeto), escopo docente (`GLOBAL` e `PROJETO`) e escopo discente em múltiplas turmas (`TURMA`) e projeto (`PROJETO`).
+- **Conformidade Anti-PII:** Utiliza exclusivamente identificadores UUID determinísticos e códigos institucionais sintéticos, sem dados pessoais reais.
+
 ---
 
 ## 4. Execução e Validação
