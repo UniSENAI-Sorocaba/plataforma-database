@@ -111,6 +111,66 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_project_participation_student_active_exten
     ON academic_pi.project_participation (student_id)
     WHERE is_extension AND status IN ('requested', 'approved');
 
+-- Diagnostico antes das FKs: falha com mensagem clara se houver registros orfaos
+DO $$
+DECLARE
+
+    orphan_instructors bigint;
+    orphan_students bigint;
+
+BEGIN
+
+    SELECT count(*) INTO orphan_instructors
+    FROM academic_pi.project_instructor i
+    LEFT JOIN auth."user" u ON u.id = i.instructor_id
+    WHERE u.id IS NULL;
+
+    SELECT count(*) INTO orphan_students
+    FROM academic_pi.project_participation p
+    LEFT JOIN auth."user" u ON u.id = p.student_id
+    WHERE u.id IS NULL;
+
+    IF orphan_instructors > 0 OR orphan_students > 0 THEN
+        RAISE EXCEPTION 'V0008 bloqueada: % docente(s) e % aluno(s) sem usuario em auth.user. Corrija os orfaos antes de aplicar.',
+            orphan_instructors, orphan_students;
+    END IF;
+END $$;
+
+-- ADD CONSTRAINT nao aceita IF NOT EXISTS: a checagem em pg_constraint torna a migration repetivel
+DO $$
+BEGIN
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'project_instructor_user_fk'
+          AND conrelid = 'academic_pi.project_instructor'::regclass
+
+    ) 
+    
+    THEN
+        ALTER TABLE academic_pi.project_instructor
+            ADD CONSTRAINT project_instructor_user_fk
+            FOREIGN KEY (instructor_id)
+            REFERENCES auth."user" (id)
+            ON DELETE RESTRICT;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'project_participation_user_fk'
+          AND conrelid = 'academic_pi.project_participation'::regclass
+
+    ) 
+    
+    THEN
+        ALTER TABLE academic_pi.project_participation
+            ADD CONSTRAINT project_participation_user_fk
+            FOREIGN KEY (student_id)
+            REFERENCES auth."user" (id)
+            ON DELETE RESTRICT;
+    END IF;
+END $$;
+
 INSERT INTO public.schema_migration (version, description)
 VALUES ('V0008', 'create project tables')
 ON CONFLICT (version) DO NOTHING;

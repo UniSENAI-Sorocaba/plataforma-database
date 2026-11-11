@@ -11,7 +11,7 @@ Banco: PostgreSQL 16 (`compose.yaml`). Scripts executados diretamente (`make` in
 | Proprietário inexistente rejeitado | FK `project_file_owner_user_fk`; remoção de proprietário com arquivos bloqueada | Passou |
 | Testes sem dados reais | IDs, e-mails e conteúdo sintéticos; dados removidos ao fim (passo 26 confirma 0 resíduos) | Passou |
 | Publicação não implícita | Padrão `false`; `true` sem autorizador rejeitado | Passou |
-| Instalação limpa e upgrade | `validate.sh` (passos 1–26) e `validate_upgrade.sh` | Passou |
+| Instalação limpa e upgrade | `validate.sh` (passos 1–30) e `validate_upgrade.sh` | Passou |
 
 ## Limitações
 - Estados de lifecycle, limite de tamanho e MIME dependem de Produto/Infra; não foram fixados.
