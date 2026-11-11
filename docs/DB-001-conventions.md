@@ -53,7 +53,7 @@ A tabela public.audit_event fornece a estrutura centralizada para registro de al
 
 - *Rastreio Temporal:* Registra a data/hora da operação via occurred_at (timestamptz).
 
-- *Deltas de Estado:* Permite armazenar os dados originais (old_data) e modificados (new_data) no formato jsonb.
+- *Deltas de Estado:* Descontinuado pela DB-007: old_data e new_data ficam sempre NULL (audit_event_no_snapshot_ck). Ver docs/DB-007-audit-event-technical.md.
 
 A implementação dos mecanismos responsáveis por gerar os eventos de auditoria fica condicionada às entregas responsáveis pela aplicação e pelo controle de acesso.
 
