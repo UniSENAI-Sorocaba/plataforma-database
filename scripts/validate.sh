@@ -548,4 +548,148 @@ BEGIN
 END $$;
 EOF
 
+echo "[validate] 27. Validando tabelas de metadados de arquivos (DB-011)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(table_name, ',' ORDER BY table_name) FROM information_schema.tables WHERE table_schema = 'assets' AND table_name IN ('file_lifecycle_state', 'project_file');" \
+  | grep -qx 'file_lifecycle_state,project_file'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid = 'assets.project_file'::regclass AND contype IN ('c', 'f', 'u');" \
+  | grep -qx 'project_file_content_hash_ck,project_file_file_type_ck,project_file_hash_algorithm_ck,project_file_lifecycle_state_fk,project_file_owner_user_fk,project_file_project_fk,project_file_publication_authorizer_fk,project_file_publication_ck,project_file_storage_ref_ck,project_file_storage_ref_unq'
+
+echo "[validate] 28. Validando que o binario nao e armazenado em assets.project_file (DB-011)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'assets' AND table_name = 'project_file' AND data_type = 'bytea';" \
+  | grep -qx '0'
+
+echo "[validate] 29. Validando regras funcionais de assets.project_file (DO block)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" <<'EOF'
+DO $$
+DECLARE
+  v_owner uuid := 'e0000000-0000-4000-8000-000000000001';
+  v_docente uuid := 'e0000000-0000-4000-8000-000000000002';
+  v_project uuid := 'e0000000-0000-4000-8000-000000000011';
+  v_hash text := encode(sha256('synthetic-file-content'::bytea), 'hex');
+  v_type text;
+  v_n int := 0;
+BEGIN
+  INSERT INTO auth."user" (id, email, full_name, status)
+  VALUES (v_owner, 'db011.owner@synthetic.local', 'Synthetic Owner', 'active'),
+         (v_docente, 'db011.docente@synthetic.local', 'Synthetic Docente', 'active');
+
+  INSERT INTO academic_pi.project (id, title, is_pi)
+  VALUES (v_project, 'Synthetic DB-011 project', true);
+
+  -- Estado de teste, existente apenas dentro deste bloco (valores reais dependem de Produto/Infra)
+  INSERT INTO assets.file_lifecycle_state (code) VALUES ('synthetic_state');
+
+  -- Teste 1: PDF, DOCX e imagem sao aceitos e o hash armazenado confere com o conteudo
+  FOREACH v_type IN ARRAY ARRAY['pdf', 'docx', 'image'] LOOP
+    v_n := v_n + 1;
+    INSERT INTO assets.project_file (id, project_id, owner_user_id, file_type, content_hash, storage_ref, lifecycle_state)
+    VALUES (('e0000000-0000-4000-8000-0000000001' || lpad(v_n::text, 2, '0'))::uuid, v_project, v_owner, v_type, v_hash, 'synthetic/' || v_type || '/' || v_n, 'synthetic_state');
+  END LOOP;
+
+  IF (SELECT count(*) FROM assets.project_file WHERE project_id = v_project AND content_hash = encode(sha256('synthetic-file-content'::bytea), 'hex')) <> 3 THEN
+    RAISE EXCEPTION 'hash armazenado nao confere com o hash do conteudo';
+  END IF;
+
+  -- Publicacao nao e implicita
+  IF (SELECT bool_or(publication_authorized) FROM assets.project_file WHERE project_id = v_project) THEN
+    RAISE EXCEPTION 'publication_authorized deveria ser false por padrao';
+  END IF;
+
+  -- Teste 2: tipo fora da lista aprovada e rejeitado
+  BEGIN
+    INSERT INTO assets.project_file (id, project_id, owner_user_id, file_type, content_hash, storage_ref, lifecycle_state)
+    VALUES ('e0000000-0000-4000-8000-000000000199', v_project, v_owner, 'exe', v_hash, 'synthetic/exe/1', 'synthetic_state');
+    RAISE EXCEPTION 'project_file_file_type_ck falhou ao permitir tipo fora da lista';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  -- Teste 3: hash invalido (tamanho e caixa) e rejeitado
+  BEGIN
+    INSERT INTO assets.project_file (id, project_id, owner_user_id, file_type, content_hash, storage_ref, lifecycle_state)
+    VALUES ('e0000000-0000-4000-8000-000000000198', v_project, v_owner, 'pdf', 'abc123', 'synthetic/hash/1', 'synthetic_state');
+    RAISE EXCEPTION 'project_file_content_hash_ck falhou ao permitir hash curto';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  BEGIN
+    INSERT INTO assets.project_file (id, project_id, owner_user_id, file_type, content_hash, storage_ref, lifecycle_state)
+    VALUES ('e0000000-0000-4000-8000-000000000197', v_project, v_owner, 'pdf', upper(v_hash), 'synthetic/hash/2', 'synthetic_state');
+    RAISE EXCEPTION 'project_file_content_hash_ck falhou ao permitir hash em maiusculas';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  -- Teste 4: referencia de armazenamento vazia e duplicada sao rejeitadas
+  BEGIN
+    INSERT INTO assets.project_file (id, project_id, owner_user_id, file_type, content_hash, storage_ref, lifecycle_state)
+    VALUES ('e0000000-0000-4000-8000-000000000196', v_project, v_owner, 'pdf', v_hash, '   ', 'synthetic_state');
+    RAISE EXCEPTION 'project_file_storage_ref_ck falhou ao permitir referencia vazia';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  BEGIN
+    INSERT INTO assets.project_file (id, project_id, owner_user_id, file_type, content_hash, storage_ref, lifecycle_state)
+    VALUES ('e0000000-0000-4000-8000-000000000195', v_project, v_owner, 'pdf', v_hash, 'synthetic/pdf/1', 'synthetic_state');
+    RAISE EXCEPTION 'project_file_storage_ref_unq falhou ao permitir referencia duplicada';
+  EXCEPTION WHEN unique_violation THEN NULL;
+  END;
+
+  -- Teste 5: proprietario inexistente e rejeitado
+  BEGIN
+    INSERT INTO assets.project_file (id, project_id, owner_user_id, file_type, content_hash, storage_ref, lifecycle_state)
+    VALUES ('e0000000-0000-4000-8000-000000000194', v_project, 'e0000000-0000-4000-8000-0000000009ff', 'pdf', v_hash, 'synthetic/owner/1', 'synthetic_state');
+    RAISE EXCEPTION 'project_file_owner_user_fk falhou ao permitir proprietario inexistente';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  -- Teste 6: referencia orfa (projeto ou lifecycle inexistente) e rejeitada
+  BEGIN
+    INSERT INTO assets.project_file (id, project_id, owner_user_id, file_type, content_hash, storage_ref, lifecycle_state)
+    VALUES ('e0000000-0000-4000-8000-000000000193', 'e0000000-0000-4000-8000-0000000009fe', v_owner, 'pdf', v_hash, 'synthetic/project/1', 'synthetic_state');
+    RAISE EXCEPTION 'project_file_project_fk falhou ao permitir projeto inexistente';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  BEGIN
+    INSERT INTO assets.project_file (id, project_id, owner_user_id, file_type, content_hash, storage_ref, lifecycle_state)
+    VALUES ('e0000000-0000-4000-8000-000000000192', v_project, v_owner, 'pdf', v_hash, 'synthetic/state/1', 'estado_inexistente');
+    RAISE EXCEPTION 'project_file_lifecycle_state_fk falhou ao permitir lifecycle inexistente';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  -- Teste 7: publicacao sem autorizador e rejeitada; com autorizador e aceita
+  BEGIN
+    INSERT INTO assets.project_file (id, project_id, owner_user_id, file_type, content_hash, storage_ref, lifecycle_state, publication_authorized)
+    VALUES ('e0000000-0000-4000-8000-000000000191', v_project, v_owner, 'image', v_hash, 'synthetic/pub/1', 'synthetic_state', true);
+    RAISE EXCEPTION 'project_file_publication_ck falhou ao permitir publicacao sem autorizador';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  INSERT INTO assets.project_file (id, project_id, owner_user_id, file_type, content_hash, storage_ref, lifecycle_state, publication_authorized, publication_authorized_by)
+  VALUES ('e0000000-0000-4000-8000-000000000190', v_project, v_owner, 'image', v_hash, 'synthetic/pub/2', 'synthetic_state', true, v_docente);
+
+  -- Teste 8: usuario proprietario com arquivos nao pode ser removido (sem orfaos)
+  BEGIN
+    DELETE FROM auth."user" WHERE id = v_owner;
+    RAISE EXCEPTION 'ON DELETE RESTRICT falhou ao permitir remover proprietario com arquivos';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  -- Limpeza dos dados sinteticos do teste
+  DELETE FROM assets.project_file WHERE project_id = v_project;
+  DELETE FROM assets.file_lifecycle_state WHERE code = 'synthetic_state';
+  DELETE FROM academic_pi.project WHERE id = v_project;
+  DELETE FROM auth."user" WHERE id IN (v_owner, v_docente);
+END $$;
+EOF
+
+echo "[validate] 30. Validando que a validacao nao deixou dados residuais em assets (DB-011)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT (SELECT count(*) FROM assets.project_file) || ',' || (SELECT count(*) FROM assets.file_lifecycle_state);" \
+  | grep -qx '0,0'
+
+echo "[validate] Todas as validacoes de compatibilidade, integridade, constraints e seeds concluidas com sucesso!"
 echo "[validate] Todas as validacoes de compatibilidade, integridade, constraints e seeds concluidas com sucesso!"
