@@ -858,4 +858,248 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NA
   "SELECT string_agg(DISTINCT scope_type, ',' ORDER BY scope_type) FROM user_roles WHERE scope_type IN ('GLOBAL', 'PROJETO', 'TURMA');" \
   | grep -qx 'GLOBAL,PROJETO,TURMA'
 
+echo "[validate] 36. Validando tabelas e registro da migration de rubricas e avaliacoes de PI (DB-010)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(table_name, ',' ORDER BY table_name) FROM information_schema.tables WHERE table_schema = 'academic_pi' AND table_name IN ('evaluation_criterion', 'project_evaluation', 'evaluation_criterion_score');" \
+  | grep -qx 'evaluation_criterion,evaluation_criterion_score,project_evaluation'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM public.schema_migration WHERE version = 'V0010';" \
+  | grep -qx '1'
+
+# Garante ausencia de tabelas de banca/agendamento e de colunas de historico de nota ou escala prematura
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'academic_pi' AND table_name ~* '(board|banca|schedule|agenda|history|historico)';" \
+  | grep -qx '0'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'academic_pi' AND table_name IN ('evaluation_criterion', 'project_evaluation', 'evaluation_criterion_score') AND column_name ~* '(previous|old_|history|snapshot|room|sala|meeting_link)';" \
+  | grep -qx '0'
+
+echo "[validate] 37. Validando check, unique, foreign keys e precisao em aberto de rubricas e avaliacoes (DB-010)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid IN ('academic_pi.evaluation_criterion'::regclass, 'academic_pi.project_evaluation'::regclass, 'academic_pi.evaluation_criterion_score'::regclass) AND contype = 'c';" \
+  | grep -qx 'evaluation_criterion_name_ck,evaluation_criterion_score_correction_ck,evaluation_criterion_weight_positive_ck,project_evaluation_assignment_ck,project_evaluation_correction_ck,project_evaluation_distinct_actors_ck,project_evaluation_finalization_ck,project_evaluation_reopen_ck'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid IN ('academic_pi.evaluation_criterion'::regclass, 'academic_pi.project_evaluation'::regclass, 'academic_pi.evaluation_criterion_score'::regclass) AND contype = 'u';" \
+  | grep -qx 'evaluation_criterion_id_project_unq,evaluation_criterion_project_name_unq,evaluation_criterion_score_eval_criterion_unq,project_evaluation_id_project_unq,project_evaluation_triplet_unq'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid IN ('academic_pi.evaluation_criterion'::regclass, 'academic_pi.project_evaluation'::regclass, 'academic_pi.evaluation_criterion_score'::regclass) AND contype = 'f';" \
+  | grep -qx 'evaluation_criterion_defined_by_user_fk,evaluation_criterion_instructor_fk,evaluation_criterion_project_fk,evaluation_criterion_score_corrected_by_instructor_fk,evaluation_criterion_score_criterion_fk,evaluation_criterion_score_evaluation_fk,project_evaluation_assigned_by_user_fk,project_evaluation_corrected_by_instructor_fk,project_evaluation_evaluated_user_fk,project_evaluation_evaluator_user_fk,project_evaluation_finalized_by_instructor_fk,project_evaluation_participation_fk,project_evaluation_project_fk,project_evaluation_reopened_by_instructor_fk'
+
+# Verifica que weight e score usam numeric sem escala/precisao cristalizada antes da aprovacao do Andre
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'academic_pi' AND ((table_name = 'evaluation_criterion' AND column_name = 'weight') OR (table_name = 'evaluation_criterion_score' AND column_name = 'score')) AND data_type = 'numeric' AND numeric_precision IS NULL AND numeric_scale IS NULL;" \
+  | grep -qx '2'
+
+echo "[validate] 38. Validando indices das tabelas de rubricas e avaliacoes (DB-010)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(indexname, ',' ORDER BY indexname) FROM pg_indexes WHERE schemaname = 'academic_pi' AND tablename IN ('evaluation_criterion', 'project_evaluation', 'evaluation_criterion_score') AND indexname LIKE 'idx_%';" \
+  | grep -qx 'idx_evaluation_criterion_defined_by_instructor_id,idx_evaluation_criterion_project_id,idx_evaluation_criterion_score_criterion_id,idx_evaluation_criterion_score_evaluation_id,idx_evaluation_criterion_score_project_id,idx_project_evaluation_assigned_by_user_id,idx_project_evaluation_evaluated_student_id,idx_project_evaluation_evaluator_user_id,idx_project_evaluation_project_id'
+
+echo "[validate] 39. Validando regras funcionais de rubricas, avaliacoes e substituicao de nota sem historico (DO block)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" <<'EOF'
+DO $$
+DECLARE
+  v_instructor uuid := 'fa100000-0000-4000-8000-000000000001';
+  v_other_user uuid := 'fa100000-0000-4000-8000-000000000002';
+  v_coord uuid := 'fa100000-0000-4000-8000-000000000003';
+  v_student_eval_1 uuid := 'fa100000-0000-4000-8000-000000000004';
+  v_student_eval_2 uuid := 'fa100000-0000-4000-8000-000000000005';
+  v_evaluated_student uuid := 'fa100000-0000-4000-8000-000000000006';
+  v_outsider_student uuid := 'fa100000-0000-4000-8000-000000000007';
+
+  v_proj_1 uuid := 'fa100000-0000-4000-8000-000000000101';
+  v_proj_2 uuid := 'fa100000-0000-4000-8000-000000000102';
+
+  v_crit_1 uuid := 'fa100000-0000-4000-8000-000000000201';
+  v_crit_2 uuid := 'fa100000-0000-4000-8000-000000000202';
+  v_crit_proj_2 uuid := 'fa100000-0000-4000-8000-000000000203';
+
+  v_eval_peer_1 uuid := 'fa100000-0000-4000-8000-000000000301';
+  v_eval_peer_2 uuid := 'fa100000-0000-4000-8000-000000000302';
+  v_eval_inst uuid := 'fa100000-0000-4000-8000-000000000303';
+
+  v_score_1 uuid := 'fa100000-0000-4000-8000-000000000401';
+  v_score_2 uuid := 'fa100000-0000-4000-8000-000000000402';
+BEGIN
+  -- Usuarios sinteticos de apoio
+  INSERT INTO auth."user" (id, email, full_name, status) VALUES
+    (v_instructor, 'db010.instructor@synthetic.local', 'DB010 Responsible Instructor', 'active'),
+    (v_other_user, 'db010.other.instructor@synthetic.local', 'DB010 Non Responsible User', 'active'),
+    (v_coord, 'db010.coord@synthetic.local', 'DB010 Coordinator', 'active'),
+    (v_student_eval_1, 'db010.peer1@synthetic.local', 'DB010 Peer Evaluator One', 'active'),
+    (v_student_eval_2, 'db010.peer2@synthetic.local', 'DB010 Peer Evaluator Two', 'active'),
+    (v_evaluated_student, 'db010.evaluated@synthetic.local', 'DB010 Evaluated Student', 'active'),
+    (v_outsider_student, 'db010.outsider@synthetic.local', 'DB010 Outsider Student', 'active');
+
+  -- Projetos PI sinteticos
+  INSERT INTO academic_pi.project (id, title, is_pi, is_extension, status) VALUES
+    (v_proj_1, 'DB010 Projeto PI Alpha', true, false, 'published'),
+    (v_proj_2, 'DB010 Projeto PI Beta', true, false, 'published');
+
+  -- Vincula docente responsavel em cada projeto e aluno participante no projeto 1
+  INSERT INTO academic_pi.project_instructor (id, project_id, instructor_id) VALUES
+    ('fa100000-0000-4000-8000-000000000501', v_proj_1, v_instructor),
+    ('fa100000-0000-4000-8000-000000000502', v_proj_2, v_other_user);
+
+  INSERT INTO academic_pi.project_participation (id, project_id, is_pi, is_extension, student_id, status) VALUES
+    ('fa100000-0000-4000-8000-000000000601', v_proj_1, true, false, v_evaluated_student, 'approved');
+
+  -- Teste 1: Docente responsavel define criterios e pesos (incluindo decimais e soma != 100)
+  INSERT INTO academic_pi.evaluation_criterion (id, project_id, defined_by_instructor_id, name, weight) VALUES
+    (v_crit_1, v_proj_1, v_instructor, 'Qualidade Tecnica da Entrega', 3.5),
+    (v_crit_2, v_proj_1, v_instructor, 'Documentacao e Arquitetura', 1.5),
+    (v_crit_proj_2, v_proj_2, v_other_user, 'Criterio Projeto 2', 10);
+
+  -- Teste 2: Usuario que NAO e docente responsavel pelo projeto nao pode definir criterio
+  BEGIN
+    INSERT INTO academic_pi.evaluation_criterion (id, project_id, defined_by_instructor_id, name, weight)
+    VALUES (gen_random_uuid(), v_proj_1, v_other_user, 'Criterio Nao Autorizado', 2.0);
+    RAISE EXCEPTION 'Constraint evaluation_criterion_instructor_fk falhou ao permitir criterio por nao responsavel';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  -- Teste 3: Criterio com nome vazio, duplicado no projeto ou peso <= 0 deve ser rejeitado
+  BEGIN
+    INSERT INTO academic_pi.evaluation_criterion (id, project_id, defined_by_instructor_id, name, weight)
+    VALUES (gen_random_uuid(), v_proj_1, v_instructor, '   ', 1.0);
+    RAISE EXCEPTION 'Constraint evaluation_criterion_name_ck falhou ao permitir nome vazio';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  BEGIN
+    INSERT INTO academic_pi.evaluation_criterion (id, project_id, defined_by_instructor_id, name, weight)
+    VALUES (gen_random_uuid(), v_proj_1, v_instructor, 'Qualidade Tecnica da Entrega', 2.0);
+    RAISE EXCEPTION 'Constraint evaluation_criterion_project_name_unq falhou ao permitir criterio duplicado';
+  EXCEPTION WHEN unique_violation THEN NULL;
+  END;
+
+  BEGIN
+    INSERT INTO academic_pi.evaluation_criterion (id, project_id, defined_by_instructor_id, name, weight)
+    VALUES (gen_random_uuid(), v_proj_1, v_instructor, 'Peso Zero', 0);
+    RAISE EXCEPTION 'Constraint evaluation_criterion_weight_positive_ck falhou ao permitir peso <= 0';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  -- Teste 4: Coordenacao atribui alunos avaliadores, projeto e data (quantidade variavel de avaliacoes)
+  INSERT INTO academic_pi.project_evaluation (id, project_id, evaluator_user_id, evaluated_student_id, assigned_by_user_id, evaluation_date) VALUES
+    (v_eval_peer_1, v_proj_1, v_student_eval_1, v_evaluated_student, v_coord, DATE '2026-11-20'),
+    (v_eval_peer_2, v_proj_1, v_student_eval_2, v_evaluated_student, v_coord, DATE '2026-11-21'),
+    (v_eval_inst, v_proj_1, v_instructor, v_evaluated_student, NULL, NULL);
+
+  -- Atribuicao pela coordenacao sem data deve ser rejeitada
+  BEGIN
+    INSERT INTO academic_pi.project_evaluation (id, project_id, evaluator_user_id, evaluated_student_id, assigned_by_user_id, evaluation_date)
+    VALUES (gen_random_uuid(), v_proj_1, v_other_user, v_evaluated_student, v_coord, NULL);
+    RAISE EXCEPTION 'Constraint project_evaluation_assignment_ck falhou ao permitir atribuicao sem evaluation_date';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  -- Teste 5: Avaliado que nao pertence ao projeto e autoavaliacao sao rejeitados
+  BEGIN
+    INSERT INTO academic_pi.project_evaluation (id, project_id, evaluator_user_id, evaluated_student_id)
+    VALUES (gen_random_uuid(), v_proj_1, v_instructor, v_outsider_student);
+    RAISE EXCEPTION 'Constraint project_evaluation_participation_fk falhou ao permitir aluno fora do projeto';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  BEGIN
+    INSERT INTO academic_pi.project_evaluation (id, project_id, evaluator_user_id, evaluated_student_id)
+    VALUES (gen_random_uuid(), v_proj_1, v_evaluated_student, v_evaluated_student);
+    RAISE EXCEPTION 'Constraint project_evaluation_distinct_actors_ck falhou ao permitir autoavaliacao';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  -- Teste 6: Lancamento de notas dos criterios (preservando valores exatos sem impor escala nao aprovada)
+  INSERT INTO academic_pi.evaluation_criterion_score (id, evaluation_id, project_id, criterion_id, score, feedback) VALUES
+    (v_score_1, v_eval_peer_1, v_proj_1, v_crit_1, 85.75, 'Entrega consistente'),
+    (v_score_2, v_eval_peer_1, v_proj_1, v_crit_2, 92, 'Boa documentacao');
+
+  -- Nota vinculada a criterio de outro projeto deve ser rejeitada
+  BEGIN
+    INSERT INTO academic_pi.evaluation_criterion_score (id, evaluation_id, project_id, criterion_id, score)
+    VALUES (gen_random_uuid(), v_eval_peer_1, v_proj_1, v_crit_proj_2, 80);
+    RAISE EXCEPTION 'Constraint evaluation_criterion_score_criterion_fk falhou ao permitir criterio de outro projeto';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  -- Teste 7: Somente docente responsavel pode finalizar, reabrir ou corrigir avaliacao
+  BEGIN
+    UPDATE academic_pi.project_evaluation
+    SET finalized_at = now(), finalized_by_instructor_id = v_other_user
+    WHERE id = v_eval_peer_1;
+    RAISE EXCEPTION 'Constraint project_evaluation_finalized_by_instructor_fk falhou ao permitir finalizacao por nao responsavel';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  UPDATE academic_pi.project_evaluation
+  SET finalized_at = now(), finalized_by_instructor_id = v_instructor, updated_at = now()
+  WHERE id = v_eval_peer_1;
+
+  UPDATE academic_pi.project_evaluation
+  SET reopened_at = now(), reopened_by_instructor_id = v_instructor, updated_at = now()
+  WHERE id = v_eval_peer_1;
+
+  -- Teste 8: Correcao substitui o valor atual sem manter historico
+  -- 8.1 Duplicar nota para o mesmo criterio na mesma avaliacao e bloqueado
+  BEGIN
+    INSERT INTO academic_pi.evaluation_criterion_score (id, evaluation_id, project_id, criterion_id, score)
+    VALUES (gen_random_uuid(), v_eval_peer_1, v_proj_1, v_crit_1, 90);
+    RAISE EXCEPTION 'Constraint evaluation_criterion_score_eval_criterion_unq falhou ao permitir segunda nota para o mesmo criterio';
+  EXCEPTION WHEN unique_violation THEN NULL;
+  END;
+
+  -- 8.2 Usuario nao responsavel nao pode assinar correcao de nota
+  BEGIN
+    UPDATE academic_pi.evaluation_criterion_score
+    SET score = 95, last_corrected_by_instructor_id = v_other_user, last_corrected_at = now()
+    WHERE id = v_score_1;
+    RAISE EXCEPTION 'Constraint evaluation_criterion_score_corrected_by_instructor_fk falhou ao permitir correcao por nao responsavel';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  -- 8.3 Docente responsavel corrige a nota substituindo o valor vigente (85.75 -> 91.25) sem historico
+  UPDATE academic_pi.evaluation_criterion_score
+  SET score = 91.25,
+      feedback = 'Nota retificada pelo docente responsavel',
+      last_corrected_by_instructor_id = v_instructor,
+      last_corrected_at = now(),
+      updated_at = now()
+  WHERE id = v_score_1;
+
+  UPDATE academic_pi.project_evaluation
+  SET corrected_at = now(),
+      corrected_by_instructor_id = v_instructor,
+      finalized_at = now(),
+      finalized_by_instructor_id = v_instructor,
+      updated_at = now()
+  WHERE id = v_eval_peer_1;
+
+  IF (SELECT count(*) FROM academic_pi.evaluation_criterion_score WHERE evaluation_id = v_eval_peer_1 AND criterion_id = v_crit_1) <> 1 THEN
+    RAISE EXCEPTION 'Correcao deveria manter exatamente 1 registro vigente para o criterio';
+  END IF;
+
+  IF (SELECT score FROM academic_pi.evaluation_criterion_score WHERE id = v_score_1) <> 91.25 THEN
+    RAISE EXCEPTION 'Correcao nao substituiu o valor vigente da nota';
+  END IF;
+
+  -- Limpeza dos registros de teste (filhos antes dos pais)
+  DELETE FROM academic_pi.evaluation_criterion_score WHERE project_id IN (v_proj_1, v_proj_2);
+  DELETE FROM academic_pi.project_evaluation WHERE project_id IN (v_proj_1, v_proj_2);
+  DELETE FROM academic_pi.evaluation_criterion WHERE project_id IN (v_proj_1, v_proj_2);
+  DELETE FROM academic_pi.project_participation WHERE project_id IN (v_proj_1, v_proj_2);
+  DELETE FROM academic_pi.project_instructor WHERE project_id IN (v_proj_1, v_proj_2);
+  DELETE FROM academic_pi.project WHERE id IN (v_proj_1, v_proj_2);
+  DELETE FROM auth."user" WHERE id IN (v_instructor, v_other_user, v_coord, v_student_eval_1, v_student_eval_2, v_evaluated_student, v_outsider_student);
+END $$;
+EOF
+
+echo "[validate] 40. Validando que a validacao nao deixou dados residuais nas tabelas de rubricas e avaliacoes (DB-010)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT (SELECT count(*) FROM academic_pi.evaluation_criterion) || ',' || (SELECT count(*) FROM academic_pi.project_evaluation) || ',' || (SELECT count(*) FROM academic_pi.evaluation_criterion_score);" \
+  | grep -qx '0,0,0'
+
 echo "[validate] Todas as validacoes de compatibilidade, integridade, constraints e seeds concluidas com sucesso!"
