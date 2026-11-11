@@ -386,4 +386,166 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NA
   "SELECT count(*) FROM auth.user_session WHERE id::text NOT LIKE 'c0000000-0000-4000-8000-%';" \
   | grep -qx '0'
 
+echo "[validate] 23. Validando tabelas e registro da migration de projetos (DB-008)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(table_name, ',' ORDER BY table_name) FROM information_schema.tables WHERE table_schema = 'academic_pi' AND table_name IN ('project', 'enrollment_period', 'project_instructor', 'project_participation');" \
+  | grep -qx 'enrollment_period,project,project_instructor,project_participation'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM public.schema_migration WHERE version = 'V0008';" \
+  | grep -qx '1'
+
+echo "[validate] 24. Validando check, unique e foreign keys das tabelas de projeto..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid IN ('academic_pi.project'::regclass, 'academic_pi.enrollment_period'::regclass, 'academic_pi.project_instructor'::regclass, 'academic_pi.project_participation'::regclass) AND contype = 'c';" \
+  | grep -qx 'enrollment_period_window_ck,project_category_ck,project_participation_category_ck,project_participation_justification_ck,project_participation_status_ck,project_period_ck,project_status_ck,project_title_ck'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid IN ('academic_pi.project'::regclass, 'academic_pi.enrollment_period'::regclass, 'academic_pi.project_instructor'::regclass, 'academic_pi.project_participation'::regclass) AND contype = 'u';" \
+  | grep -qx 'project_id_category_unq,project_instructor_project_instructor_unq,project_participation_project_student_unq'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid IN ('academic_pi.enrollment_period'::regclass, 'academic_pi.project_instructor'::regclass, 'academic_pi.project_participation'::regclass) AND contype = 'f';" \
+  | grep -qx 'enrollment_period_project_fk,project_instructor_project_fk,project_instructor_user_fk,project_participation_project_fk,project_participation_user_fk'
+
+echo "[validate] 25. Validando indices das tabelas de projeto..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(indexname, ',' ORDER BY indexname) FROM pg_indexes WHERE schemaname = 'academic_pi' AND tablename IN ('project', 'enrollment_period', 'project_instructor', 'project_participation') AND indexname LIKE 'idx_%';" \
+  | grep -qx 'idx_enrollment_period_project_id,idx_project_instructor_instructor_id,idx_project_participation_student_active_extension,idx_project_participation_student_active_pi,idx_project_participation_student_id'
+
+echo "[validate] 26. Validando regras funcionais e de integridade das tabelas de projeto (DO block)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" <<'EOF'
+DO $$
+DECLARE
+  v_student_1 uuid := 'f8000000-0000-4000-8000-0000000000a1';
+  v_student_2 uuid := 'f8000000-0000-4000-8000-0000000000a2';
+  v_instructor uuid := 'f8000000-0000-4000-8000-0000000000b1';
+  p_pi uuid := 'f8000000-0000-4000-8000-000000000001';
+  p_pi_2 uuid := 'f8000000-0000-4000-8000-000000000002';
+  p_dual uuid := 'f8000000-0000-4000-8000-000000000003';
+  p_ext uuid := 'f8000000-0000-4000-8000-000000000004';
+BEGIN
+  -- Usuarios sinteticos de apoio
+  INSERT INTO auth.user (id, email, full_name, status) VALUES
+    (v_student_1, 'db008.validate.student1@synthetic.local', 'DB008 Validate Student One', 'active'),
+    (v_student_2, 'db008.validate.student2@synthetic.local', 'DB008 Validate Student Two', 'active'),
+    (v_instructor, 'db008.validate.instructor1@synthetic.local', 'DB008 Validate Instructor', 'active');
+
+  INSERT INTO academic_pi.project (id, title, is_pi, is_extension) VALUES
+    (p_pi, 'Validate PI 1', true, false),
+    (p_pi_2, 'Validate PI 2', true, false),
+    (p_dual, 'Validate Dual', true, true),
+    (p_ext, 'Validate Extension', false, true);
+
+  -- Teste 1: projeto sem categoria
+  BEGIN
+    INSERT INTO academic_pi.project (id, title, is_pi, is_extension)
+    VALUES (gen_random_uuid(), 'Sem categoria', false, false);
+    RAISE EXCEPTION 'Constraint project_category_ck falhou ao permitir projeto sem categoria';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  -- Teste 2: titulo vazio
+  BEGIN
+    INSERT INTO academic_pi.project (id, title, is_pi, is_extension)
+    VALUES (gen_random_uuid(), '   ', true, false);
+    RAISE EXCEPTION 'Constraint project_title_ck falhou ao permitir titulo vazio';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  -- Teste 3: janela de inscricao invertida
+  BEGIN
+    INSERT INTO academic_pi.enrollment_period (id, project_id, opens_at, closes_at)
+    VALUES (gen_random_uuid(), p_pi, now(), now() - interval '1 day');
+    RAISE EXCEPTION 'Constraint enrollment_period_window_ck falhou ao permitir fechamento anterior a abertura';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  -- Teste 4: aluno e docente inexistentes
+  BEGIN
+    INSERT INTO academic_pi.project_participation (id, project_id, is_pi, is_extension, student_id)
+    VALUES (gen_random_uuid(), p_pi, true, false, gen_random_uuid());
+    RAISE EXCEPTION 'Constraint project_participation_user_fk falhou ao permitir aluno inexistente';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  BEGIN
+    INSERT INTO academic_pi.project_instructor (id, project_id, instructor_id)
+    VALUES (gen_random_uuid(), p_pi, gen_random_uuid());
+    RAISE EXCEPTION 'Constraint project_instructor_user_fk falhou ao permitir docente inexistente';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  -- Teste 5: docente valido e repeticao no mesmo projeto
+  INSERT INTO academic_pi.project_instructor (id, project_id, instructor_id)
+  VALUES (gen_random_uuid(), p_pi, v_instructor);
+
+  BEGIN
+    INSERT INTO academic_pi.project_instructor (id, project_id, instructor_id)
+    VALUES (gen_random_uuid(), p_pi, v_instructor);
+    RAISE EXCEPTION 'Constraint project_instructor_project_instructor_unq falhou ao permitir docente repetido';
+  EXCEPTION WHEN unique_violation THEN NULL;
+  END;
+
+  -- Teste 6: categorias da participacao divergentes do projeto
+  BEGIN
+    INSERT INTO academic_pi.project_participation (id, project_id, is_pi, is_extension, student_id)
+    VALUES (gen_random_uuid(), p_pi, false, true, v_student_1);
+    RAISE EXCEPTION 'FK composta falhou ao permitir categorias divergentes do projeto';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  -- Teste 7: limite de 1 PI + 1 Extensao por estudante
+  INSERT INTO academic_pi.project_participation (id, project_id, is_pi, is_extension, student_id)
+  VALUES (gen_random_uuid(), p_pi, true, false, v_student_1);
+
+  BEGIN
+    INSERT INTO academic_pi.project_participation (id, project_id, is_pi, is_extension, student_id)
+    VALUES (gen_random_uuid(), p_pi_2, true, false, v_student_1);
+    RAISE EXCEPTION 'Indice idx_project_participation_student_active_pi falhou ao permitir segundo PI ativo';
+  EXCEPTION WHEN unique_violation THEN NULL;
+  END;
+
+  INSERT INTO academic_pi.project_participation (id, project_id, is_pi, is_extension, student_id)
+  VALUES (gen_random_uuid(), p_ext, false, true, v_student_1);
+
+  BEGIN
+    INSERT INTO academic_pi.project_participation (id, project_id, is_pi, is_extension, student_id)
+    VALUES (gen_random_uuid(), p_dual, true, true, v_student_1);
+    RAISE EXCEPTION 'Indices parciais falharam ao permitir projeto duplo com as duas vagas ocupadas';
+  EXCEPTION WHEN unique_violation THEN NULL;
+  END;
+
+  -- Teste 8: remocao exige justificativa
+  BEGIN
+    INSERT INTO academic_pi.project_participation (id, project_id, is_pi, is_extension, student_id, status)
+    VALUES (gen_random_uuid(), p_pi_2, true, false, v_student_2, 'removed');
+    RAISE EXCEPTION 'Constraint project_participation_justification_ck falhou ao permitir remocao sem justificativa';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  INSERT INTO academic_pi.project_participation (id, project_id, is_pi, is_extension, student_id, status, justification)
+  VALUES (gen_random_uuid(), p_pi_2, true, false, v_student_2, 'removed', 'Motivo sintetico de validacao');
+
+  -- Teste 9: ON DELETE RESTRICT protege projeto e usuario
+  BEGIN
+    DELETE FROM academic_pi.project WHERE id = p_pi;
+    RAISE EXCEPTION 'ON DELETE RESTRICT falhou ao permitir apagar projeto com participacao';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  BEGIN
+    DELETE FROM auth.user WHERE id = v_student_1;
+    RAISE EXCEPTION 'ON DELETE RESTRICT falhou ao permitir apagar usuario com participacao';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  -- Limpeza dos registros de teste (filhos antes dos pais)
+  DELETE FROM academic_pi.project_participation WHERE student_id IN (v_student_1, v_student_2);
+  DELETE FROM academic_pi.project_instructor WHERE instructor_id = v_instructor;
+  DELETE FROM academic_pi.project WHERE id IN (p_pi, p_pi_2, p_dual, p_ext);
+  DELETE FROM auth.user WHERE id IN (v_student_1, v_student_2, v_instructor);
+END $$;
+EOF
+
 echo "[validate] Todas as validacoes de compatibilidade, integridade, constraints e seeds concluidas com sucesso!"
