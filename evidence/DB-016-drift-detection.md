@@ -42,7 +42,7 @@ A entrega **DB-016** fecha a lacuna de integridade estrutural entre uma instalac
 - Normaliza DDL via `pg_dump --schema-only --no-owner`:
   - Remove linhas de cabecalho, metadados e comentarios iniciados em `--`.
   - Remove linhas vazias e normaliza quebras de linha (`\r`).
-  - Descarta comandos `SELECT pg_catalog.setval(...)`, garantindo que contadores de sequence (dados) nao afetem a comparacao da estrutura (schema).
+  - Descarta comandos `SELECT pg_catalog.setval(...)` e meta-comandos de seguranca psql (`\restrict` e `\unrestrict`), garantindo que contadores de sequence (dados) e tokens transientes de sessao gerados a cada dump nao afetem a comparacao da estrutura (schema).
 - Realiza verificacao cruzada de objetos no catalogo (`pg_catalog`).
 - Executa `diff -u` entre os arquivos SQL normalizados. Emite saida legivel e encerra com codigo de retorno nao-nulo em caso de divergencia.
 

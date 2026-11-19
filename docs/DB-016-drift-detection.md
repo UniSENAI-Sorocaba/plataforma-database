@@ -60,7 +60,8 @@ Para comparar com fidelidade os schemas gerados pelos dois metodos sem incorrer 
 1. **Extracao DDL (`pg_dump --schema-only`):** Extrai unicamente os objetos estruturais (tabelas, tipos, colunas, check constraints, foreign keys, chaves primarias, chaves unicas e indices). A opcao `--no-owner` e utilizada para garantir portabilidade independente do superusuario de execucao.
 2. **Filtragem de Metadados e Comentarios:** Linhas iniciadas em `--` (cabecalhos com versao do pg_dump, datas/timestamps e comentarios de secao) sao descartadas.
 3. **Filtragem de Estado Transiente de Sequencias (`setval`):** Sequencias serial geradas em `V0006` tem seus valores de controle interno (`SELECT pg_catalog.setval(...)`) excluidos da comparacao estrutural, visto que representam estado de insercao de dados e nao estrutura de schema.
-4. **Normalizacao de Quebras de Linha e Espacos:** Conversao estrita para terminacao Unix (LF) e remocao de linhas vazias redundantes.
+4. **Filtragem de Meta-comandos psql (`\restrict` e `\unrestrict`):** Diretivas de seguranca emitidas com chaves aleatorias por execucao do `pg_dump` (CVE-2025-8714) sao descartadas para evitar falsos positivos de metadados transientes de sessao.
+5. **Normalizacao de Quebras de Linha e Espacos:** Conversao estrita para terminacao Unix (LF) e remocao de linhas vazias redundantes.
 
 ---
 

@@ -29,14 +29,14 @@ TMP_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t 'schema_drift')"
 trap 'rm -rf "$TMP_DIR"' EXIT INT TERM
 
 # 3. Funcao de extracao normalizada de schema
-# Remove comentarios (--), linhas em branco, CRLF e setvals de sequences (dados/estado transiente)
+# Remove comentarios (--), linhas em branco, CRLF, setvals de sequences e meta-comandos psql (\restrict, \unrestrict)
 dump_normalized_schema() {
   target_db="$1"
   docker compose exec -T postgres pg_dump -U "$DB_USER" -d "$target_db" \
     --schema-only \
     --no-owner \
     | tr -d '\r' \
-    | sed -e '/^--/d' -e '/^[[:space:]]*$/d' -e '/SELECT pg_catalog\.setval/d'
+    | sed -e '/^--/d' -e '/^[[:space:]]*$/d' -e '/SELECT pg_catalog\.setval/d' -e '/^\\/d'
 }
 
 echo "1. Extraindo DDL normalizado da instalacao limpa ($CLEAN_DB)..."
