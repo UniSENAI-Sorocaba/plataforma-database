@@ -1,4 +1,4 @@
-.PHONY: up down migrate seed validate validate-upgrade test
+.PHONY: up down migrate seed validate validate-upgrade detect-drift test
 
 up:
 	docker compose up -d --wait
@@ -17,5 +17,8 @@ validate:
 
 validate-upgrade:
 	./scripts/validate_upgrade.sh
+
+detect-drift:
+	./scripts/detect_drift.sh
 
 test: validate validate-upgrade

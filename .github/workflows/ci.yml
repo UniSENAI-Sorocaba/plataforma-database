@@ -31,7 +31,7 @@ jobs:
       - name: Clean Install - Valida compatibilidade e integridade
         run: make validate
 
-      - name: Upgrade Validation - Executa teste de upgrade e compatibilidade
+      - name: Upgrade Validation & Drift Detection - Executa teste de upgrade e deteccao de drift
         run: make validate-upgrade
 
       - name: Finaliza servico de banco de dados

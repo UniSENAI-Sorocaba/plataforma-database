@@ -20,7 +20,7 @@ A pipeline executa:
 2. Aplicação sequencial de migrations (`make migrate`);
 3. Injeção de seeds determinísticos e sintéticos sem dados pessoais (`make seed`);
 4. Validação estrutural de compatibilidade, segurança e conformidade de seeds (`make validate`);
-5. Validação de atualização incremental e idempotência de migrations e seeds (`make validate-upgrade`);
+5. Validação de atualização incremental, idempotência e detecção de drift estrutural entre instalação limpa e upgrade (`make validate-upgrade`);
 6. Encerramento ordenado dos containers (`make down`).
 
 ## Validação local
@@ -40,19 +40,22 @@ make seed
 # 4. Valida a estrutura, schemas, tabelas, índices, postura de segurança e conformidade dos seeds
 make validate
 
-# 5. Valida o fluxo de upgrade incremental e a idempotência de migrations e seeds
+# 5. Valida o fluxo de upgrade incremental, a idempotência e detecta drift de schema
 make validate-upgrade
 
-# 6. Ou executa todas as validações de uma vez
+# 6. Ou executa a detecção de drift diretamente entre dois bancos
+make detect-drift
+
+# 7. Ou executa todas as validações de uma vez
 make test
 
-# 7. Encerra e remove os containers locais
+# 8. Encerra e remove os containers locais
 make down
 ```
 
 O comando `make validate` verifica a existência dos schemas de domínio, a tabela de controle `public.schema_migration`, a tabela de auditoria `public.audit_event`, integridade de restrições (check constraints), índices, postura de segurança (ausência de privilégios públicos para a role `PUBLIC`), cobertura de seeds nos 5 schemas de domínio e conformidade Anti-PII (LGPD).
 
-O comando `make validate-upgrade` valida a migração incremental a partir do estado anterior (baseline V0001) para a versão atual, além de testar a idempotência de reaplicação das migrações e das sementes sintéticas.
+O comando `make validate-upgrade` valida a migração incremental a partir do estado anterior (baseline V0001) para a versão atual, cobre todas as migrations da branch, testa a idempotência de reaplicação das migrações e das sementes sintéticas, e invoca o `scripts/detect_drift.sh` para assegurar que a instalação limpa e o upgrade produzem schemas 100% equivalentes.
 
 ## Documentação e Evidências
 
@@ -62,6 +65,7 @@ O comando `make validate-upgrade` valida a migração incremental a partir do es
 - [DB-004: Identidade, Usuário e Vínculo Acadêmico](docs/DB-004-identity-user-link.md)
 - [DB-005: Sessões, Hashes, Expiração, Revogação e Rotação de Tokens](docs/DB-005-session-tokens.md)
 - [DB-006: Papéis, Permissões e Escopos de Autorização RBAC](docs/DB-006-roles-and-scopes.md)
+- [DB-016: Detecção de Drift Estrutural e Fixtures Determinísticas](docs/DB-016-drift-detection.md)
 - [Diretrizes e Catálogo de Seeds](seeds/README.md)
 - [Evidência DB-001: Segurança e Privilégios](evidence/DB-001-security.txt)
 - [Evidência DB-002: Validação de CI, Instalação Limpa e Upgrade](evidence/DB-002-ci-validation.md)
@@ -69,6 +73,7 @@ O comando `make validate-upgrade` valida a migração incremental a partir do es
 - [Evidência DB-004: Identidade, Usuário e Vínculo com Constraints e Migration Testada](evidence/DB-004-identity-user-link.md)
 - [Evidência DB-005: Sessões e Tokens com Hash, Expiração, Revogação e Índices](evidence/DB-005-session-tokens.md)
 - [Evidência DB-006: Papéis, Permissões e Escopos com Prevenção de Duplicidade](evidence/DB-006-roles-and-scopes.md)
+- [Evidência DB-016: Detecção de Drift entre Instalação e Upgrade com Fixtures Determinísticas](evidence/DB-016-drift-detection.md)
 
 ## Pendência de governança
 

@@ -14,10 +14,18 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NA
   "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'schema_migration';" \
   | grep -qx '1'
 
-echo "[validate] 3. Validando registro das migrations aplicadas..."
-docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
-  "SELECT string_agg(version, ',' ORDER BY version) FROM public.schema_migration WHERE version IN ('V0001', 'V0002', 'V0003', 'V0004');" \
-  | grep -qx 'V0001,V0002,V0003,V0004'
+echo "[validate] 3. Validando registro de todas as migrations aplicadas..."
+expected_versions=$(for f in migrations/*.sql; do [ -e "$f" ] && basename "$f" | cut -d'_' -f1; done | sort | paste -sd, -)
+applied_versions=$(docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(version, ',' ORDER BY version) FROM public.schema_migration;")
+
+if [ "$expected_versions" != "$applied_versions" ]; then
+  echo "ERRO [validate]: Divergencia nas migrations registradas em $DB_NAME!" >&2
+  echo "Esperadas: $expected_versions" >&2
+  echo "Registradas: $applied_versions" >&2
+  exit 1
+fi
+echo "   Todas as migrations da branch registradas com sucesso em $DB_NAME: $applied_versions"
 
 echo "[validate] 4. Validando tabela public.audit_event..."
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
@@ -857,5 +865,35 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NA
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
   "SELECT string_agg(DISTINCT scope_type, ',' ORDER BY scope_type) FROM user_roles WHERE scope_type IN ('GLOBAL', 'PROJETO', 'TURMA');" \
   | grep -qx 'GLOBAL,PROJETO,TURMA'
+
+echo "[validate] 36. Validando presenca e integridade de seeds deterministicos em projetos (DB-008 e DB-016)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT (count(*) >= 4)::text FROM academic_pi.project;" | grep -qx 'true'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT (count(*) >= 3)::text FROM academic_pi.enrollment_period;" | grep -qx 'true'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT (count(*) >= 3)::text FROM academic_pi.project_instructor;" | grep -qx 'true'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT (count(*) >= 5)::text FROM academic_pi.project_participation;" | grep -qx 'true'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(DISTINCT status, ',' ORDER BY status) FROM academic_pi.project_participation WHERE status IN ('approved', 'requested', 'removed', 'withdrawn');" \
+  | grep -qx 'approved,removed,requested,withdrawn'
+
+echo "[validate] 37. Validando conformidade Anti-PII e determinismo nas tabelas de projeto..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM academic_pi.project WHERE id::text NOT LIKE 'b0000000-0000-4000-8000-0000000001%';" \
+  | grep -qx '0'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM academic_pi.project WHERE (title ~* '(@gmail|@hotmail|@outlook|@yahoo|@senai|@unisenai|[0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2})') OR (description ~* '(@gmail|@hotmail|@outlook|@yahoo|@senai|@unisenai|[0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2})');" \
+  | grep -qx '0'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM academic_pi.project_participation WHERE justification IS NOT NULL AND justification ~* '(@gmail|@hotmail|@outlook|@yahoo|@senai|@unisenai|[0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2})';" \
+  | grep -qx '0'
 
 echo "[validate] Todas as validacoes de compatibilidade, integridade, constraints e seeds concluidas com sucesso!"
