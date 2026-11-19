@@ -71,6 +71,16 @@ Para assegurar clareza, rastreabilidade e evitar colisões entre entidades, os s
   - `user_roles`: 7 atribuições sintéticas vinculadas aos usuários determinísticos de `auth.user` (`b0000000-0000-4000-8000-000000000001` a `...0003`), cobrindo acúmulo de papéis na mesma conta (`COORDENACAO` global + `DOCENTE` em projeto), escopo docente (`GLOBAL` e `PROJETO`) e escopo discente em múltiplas turmas (`TURMA`) e projeto (`PROJETO`).
 - **Conformidade Anti-PII:** Utiliza exclusivamente identificadores UUID determinísticos e códigos institucionais sintéticos, sem dados pessoais reais.
 
+### `0005_project_tables.sql`
+- **Tabelas Alvo:** `academic_pi.project`, `academic_pi.enrollment_period`, `academic_pi.project_instructor`, `academic_pi.project_participation`
+- **Migration Mínima Exigida:** `V0008__create_project_tables.sql` (depende de `V0003__create_identity_user_and_academic_link.sql` e `0002_identity_user_link.sql`)
+- **Cobertura de Domínios e Cenários:**
+  - `academic_pi.project`: 4 projetos sintéticos determinísticos cobrindo categorias PI, Extensão, Híbrido (PI + Extensão) e status `published`, `draft` e `archived`.
+  - `academic_pi.enrollment_period`: 3 janelas de inscrição válidas (`closes_at >= opens_at`) associadas aos projetos ativos.
+  - `academic_pi.project_instructor`: Responsáveis docentes vinculados aos usuários de `auth.user` (`b0000000-0000-4000-8000-000000000002` e `...0003`).
+  - `academic_pi.project_participation`: 5 participações sintéticas demonstrando conformidade com as constraints reais: estudante com 1 PI e 1 Extensão ativos simultaneamente (`approved`), participação desistida (`withdrawn`), remoção justificada (`removed` com justificativa preenchida) e solicitação pendente (`requested`).
+- **Conformidade Anti-PII:** Títulos, descrições e justificativas 100% fictícios, sem menção a dados pessoais reais.
+
 ---
 
 ## 4. Execução e Validação
