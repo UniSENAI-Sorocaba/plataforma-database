@@ -1,0 +1,41 @@
+=== [DB-006] Evidencia de Validacao: Papeis, Permissoes e Escopos ===
+Work ID: DB-006 (Issue #6)
+Migration: migrations/V0006__create_rbac_schema.sql
+Seeds: seeds/0004_rbac_roles_and_scopes.sql
+Documentacao: docs/DB-006-roles-and-scopes.md
+Relatorio Completo: evidence/DB-006-roles-and-scopes.md
+
+[1] Objetos Verificados no PostgreSQL 16:
+- Tabelas: public.roles, public.permissions, public.role_permissions, public.user_roles
+- Registro em public.schema_migration: V0006 ('create rbac schema')
+- Constraints UNIQUE:
+  * roles_name_key (name)
+  * uk_permissions_action_resource (action, resource)
+  * role_permissions_pkey (role_id, permission_id)
+  * uk_user_role_scope (user_id, role_id, scope_type, scope_id)
+- Constraints CHECK:
+  * roles_name_ck: length(trim(name)) > 0
+  * permissions_action_ck: length(trim(action)) > 0
+  * permissions_resource_ck: length(trim(resource)) > 0
+  * user_roles_scope_type_ck: scope_type IN ('GLOBAL', 'PROJETO', 'TURMA', 'CURSO')
+  * user_roles_scope_id_ck: length(trim(scope_id)) > 0
+  * user_roles_scope_consistency_ck: (scope_type = 'GLOBAL' AND scope_id = '*') OR (scope_type <> 'GLOBAL' AND scope_id <> '*')
+- Constraints FOREIGN KEY:
+  * user_roles_user_fk -> auth.user(id) ON DELETE CASCADE
+  * user_roles_assigned_by_fk -> auth.user(id) ON DELETE SET NULL
+  * role_permissions(role_id) -> roles(id) ON DELETE CASCADE
+  * role_permissions(permission_id) -> permissions(id) ON DELETE CASCADE
+  * user_roles(role_id) -> roles(id) ON DELETE CASCADE
+- Indices:
+  * idx_user_roles_lookup ON user_roles (user_id, scope_type, scope_id)
+  * idx_user_roles_role_id ON user_roles (role_id)
+  * idx_role_permissions_role ON role_permissions (role_id)
+  * idx_role_permissions_permission ON role_permissions (permission_id)
+
+[2] Validacao Funcional e de Upgrade (scripts/validate.sh passos 31-35 e scripts/validate_upgrade.sh):
+- [validate] 31. Validando tabelas e registro da migration de RBAC (DB-006)... OK
+- [validate] 32. Validando check, unique e foreign keys das tabelas de RBAC (DB-006)... OK
+- [validate] 33. Validando indices das tabelas de RBAC (DB-006)... OK
+- [validate] 34. Validando regras funcionais, prevencao de duplicidade, suporte a escopo e acumulo de papeis em RBAC (DO block)... OK
+- [validate] 35. Validando presenca e cobertura de seeds deterministicos em RBAC (DB-006)... OK
+- [validate_upgrade] Verificando que V0002, V0003, V0004 e V0006 foram aplicadas no upgrade e sao idempotentes... OK

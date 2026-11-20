@@ -305,4 +305,20 @@ BEGIN
 END $$;
 EOF
 
+echo "[validate] 21. Validando modelo RBAC, escopos e integridade (DB-006)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(table_name, ',' ORDER BY table_name) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('permissions', 'role_permissions', 'roles', 'user_roles');" \
+  | grep -qx 'permissions,role_permissions,roles,user_roles'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM public.schema_migration WHERE version = 'V0006';" | grep -qx '1'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid IN ('public.roles'::regclass, 'public.permissions'::regclass, 'public.user_roles'::regclass) AND contype = 'c';" \
+  | grep -qx 'permissions_action_ck,permissions_resource_ck,roles_name_ck,user_roles_scope_consistency_ck,user_roles_scope_id_ck,user_roles_scope_type_ck'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT (count(*) >= 3)::text || ',' || (SELECT (count(*) >= 7)::text FROM public.permissions) || ',' || (SELECT (count(*) >= 7)::text FROM public.user_roles) FROM public.roles;" \
+  | grep -qx 'true,true,true'
+
 echo "[validate] Todas as validacoes de compatibilidade, integridade, constraints e seeds concluidas com sucesso!"
