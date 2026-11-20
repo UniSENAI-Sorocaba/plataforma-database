@@ -247,4 +247,62 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NA
   "SELECT count(*) FROM auth.user_identity WHERE email ~* '(@gmail|@hotmail|@outlook|@yahoo|@senai|@unisenai)'; " \
   | grep -qx '0'
 
+echo "[validate] 18. Validando tabelas de sessao e recuperacao (DB-005)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(table_name, ',' ORDER BY table_name) FROM information_schema.tables WHERE table_schema = 'auth' AND table_name IN ('password_recovery_token', 'refresh_token', 'session');" \
+  | grep -qx 'password_recovery_token,refresh_token,session'
+
+echo "[validate] 19. Validando indices de expiracao e consulta por sessao/familia..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(indexname, ',' ORDER BY indexname) FROM pg_indexes WHERE schemaname = 'auth' AND indexname IN ('idx_password_recovery_expiration','idx_password_recovery_user','idx_refresh_token_expiration','idx_refresh_token_family','idx_refresh_token_session','idx_session_expiration','idx_session_family_id','idx_session_user_status');" \
+  | grep -qx 'idx_password_recovery_expiration,idx_password_recovery_user,idx_refresh_token_expiration,idx_refresh_token_family,idx_refresh_token_session,idx_session_expiration,idx_session_family_id,idx_session_user_status'
+
+echo "[validate] 20. Validando comportamento de rotacao, revogacao e uso unico..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" <<'EOF'
+DO $$
+DECLARE
+  v_user_id uuid := 'f0000000-0000-4000-8000-000000000001';
+  v_session_id uuid := 'f0000000-0000-4000-8000-000000000041';
+  v_family_id uuid := 'f0000000-0000-4000-8000-000000000042';
+  v_refresh_id uuid := 'f0000000-0000-4000-8000-000000000043';
+  v_recovery_id uuid := 'f0000000-0000-4000-8000-000000000044';
+  v_now timestamptz := '2026-01-01T10:00:00Z';
+BEGIN
+  INSERT INTO auth.user (id, email, full_name, status)
+  VALUES (v_user_id, 'session.test@synthetic.local', 'Session Test User', 'active');
+
+  INSERT INTO auth.session (id, user_id, family_id, created_at, expires_at)
+  VALUES (v_session_id, v_user_id, v_family_id, v_now, v_now + interval '30 days');
+
+  INSERT INTO auth.refresh_token (id, session_id, family_id, token_hash, issued_at, expires_at)
+  VALUES (v_refresh_id, v_session_id, v_family_id, repeat('a', 64), v_now, v_now + interval '30 days');
+
+  UPDATE auth.refresh_token
+     SET used_at = v_now + interval '1 minute'
+   WHERE id = v_refresh_id;
+
+  UPDATE auth.session
+     SET status = 'revoked', revoked_at = v_now + interval '1 minute', revoked_reason = 'reuse'
+   WHERE id = v_session_id;
+
+  INSERT INTO auth.password_recovery_token (id, user_id, token_hash, created_at, expires_at)
+  VALUES (v_recovery_id, v_user_id, repeat('b', 64), v_now, v_now + interval '15 minutes');
+
+  UPDATE auth.password_recovery_token
+     SET used_at = v_now + interval '2 minutes'
+   WHERE id = v_recovery_id;
+
+  IF (SELECT status FROM auth.session WHERE id = v_session_id) <> 'revoked'
+     OR (SELECT used_at IS NOT NULL FROM auth.refresh_token WHERE id = v_refresh_id) IS NOT TRUE
+     OR (SELECT used_at IS NOT NULL FROM auth.password_recovery_token WHERE id = v_recovery_id) IS NOT TRUE THEN
+    RAISE EXCEPTION 'Lifecycle DB-005 nao foi persistido corretamente';
+  END IF;
+
+  DELETE FROM auth.password_recovery_token WHERE id = v_recovery_id;
+  DELETE FROM auth.refresh_token WHERE id = v_refresh_id;
+  DELETE FROM auth.session WHERE id = v_session_id;
+  DELETE FROM auth.user WHERE id = v_user_id;
+END $$;
+EOF
+
 echo "[validate] Todas as validacoes de compatibilidade, integridade, constraints e seeds concluidas com sucesso!"
