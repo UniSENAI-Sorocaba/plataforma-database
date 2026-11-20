@@ -3,6 +3,7 @@
 -- Estritamente sintetico, sem dados pessoais reais (alinhado a seeds/README.md, ADR-011 e DB-003)
 -- Cobre os 5 schemas de dominio: auth, academic_pi, extension, assets e institutional
 -- Cobre as 3 operacoes permitidas: INSERT, UPDATE, DELETE
+-- DB-007: old_data/new_data sempre NULL (sem snapshots de valores academicos; audit_event_no_snapshot_ck)
 
 INSERT INTO public.audit_event (
     id,
@@ -28,7 +29,7 @@ VALUES
         'b0000000-0000-4000-8000-000000000001',
         'a0000000-0000-4000-8000-000000000001',
         NULL,
-        '{"entity": "synthetic_user", "username": "mock.student.01", "email": "mock.student.01@synthetic.local", "role": "student", "status": "active"}'::jsonb
+        NULL
     ),
     (
         '00000000-0000-4000-8000-000000000002',
@@ -38,8 +39,8 @@ VALUES
         'UPDATE',
         'b0000000-0000-4000-8000-000000000001',
         'a0000000-0000-4000-8000-000000000002',
-        '{"role": "student", "status": "pending"}'::jsonb,
-        '{"role": "student", "status": "active"}'::jsonb
+        NULL,
+        NULL
     ),
     (
         '00000000-0000-4000-8000-000000000003',
@@ -49,7 +50,7 @@ VALUES
         'DELETE',
         'b0000000-0000-4000-8000-000000000002',
         'a0000000-0000-4000-8000-000000000001',
-        '{"session_token_id": "syn-token-expired-001", "revoked_at": "2026-01-01T10:02:00Z"}'::jsonb,
+        NULL,
         NULL
     ),
 
@@ -65,7 +66,7 @@ VALUES
         'b0000000-0000-4000-8000-000000000003',
         'a0000000-0000-4000-8000-000000000003',
         NULL,
-        '{"project_code": "PI-2026-SYN-001", "title": "Synthetic AI Platform Architecture", "status": "draft"}'::jsonb
+        NULL
     ),
     (
         '00000000-0000-4000-8000-000000000005',
@@ -75,8 +76,8 @@ VALUES
         'UPDATE',
         'b0000000-0000-4000-8000-000000000003',
         'a0000000-0000-4000-8000-000000000003',
-        '{"status": "draft"}'::jsonb,
-        '{"status": "submitted"}'::jsonb
+        NULL,
+        NULL
     ),
     (
         '00000000-0000-4000-8000-000000000006',
@@ -86,7 +87,7 @@ VALUES
         'DELETE',
         'b0000000-0000-4000-8000-000000000004',
         'a0000000-0000-4000-8000-000000000003',
-        '{"draft_code": "PI-DRAFT-TEMP-001", "reason": "superseded_by_submission"}'::jsonb,
+        NULL,
         NULL
     ),
 
@@ -102,7 +103,7 @@ VALUES
         'b0000000-0000-4000-8000-000000000005',
         'a0000000-0000-4000-8000-000000000004',
         NULL,
-        '{"action_code": "EXT-2026-SYN-101", "name": "Synthetic Community Workshop", "target_audience": "regional_partner"}'::jsonb
+        NULL
     ),
     (
         '00000000-0000-4000-8000-000000000008',
@@ -112,8 +113,8 @@ VALUES
         'UPDATE',
         'b0000000-0000-4000-8000-000000000005',
         'a0000000-0000-4000-8000-000000000004',
-        '{"approval_status": "in_review"}'::jsonb,
-        '{"approval_status": "approved"}'::jsonb
+        NULL,
+        NULL
     ),
     (
         '00000000-0000-4000-8000-000000000009',
@@ -123,7 +124,7 @@ VALUES
         'DELETE',
         'b0000000-0000-4000-8000-000000000006',
         'a0000000-0000-4000-8000-000000000004',
-        '{"prospect_code": "EXT-PROSPECT-TEMP-001", "cancelled_reason": "duplicate_entry"}'::jsonb,
+        NULL,
         NULL
     ),
 
@@ -139,7 +140,7 @@ VALUES
         'b0000000-0000-4000-8000-000000000007',
         'a0000000-0000-4000-8000-000000000005',
         NULL,
-        '{"asset_tag": "SYN-ASSET-001", "equipment_type": "workstation_cluster", "room": "LAB-101", "status": "available"}'::jsonb
+        NULL
     ),
     (
         '00000000-0000-4000-8000-000000000011',
@@ -149,8 +150,8 @@ VALUES
         'UPDATE',
         'b0000000-0000-4000-8000-000000000007',
         'a0000000-0000-4000-8000-000000000005',
-        '{"status": "available"}'::jsonb,
-        '{"status": "reserved_for_pi"}'::jsonb
+        NULL,
+        NULL
     ),
     (
         '00000000-0000-4000-8000-000000000012',
@@ -160,7 +161,7 @@ VALUES
         'DELETE',
         'b0000000-0000-4000-8000-000000000008',
         'a0000000-0000-4000-8000-000000000005',
-        '{"reservation_id": "SYN-RES-TEMP-001", "status": "completed"}'::jsonb,
+        NULL,
         NULL
     ),
 
@@ -176,7 +177,7 @@ VALUES
         'b0000000-0000-4000-8000-000000000009',
         'a0000000-0000-4000-8000-000000000005',
         NULL,
-        '{"unit_code": "SYN-SOR-01", "name": "Synthetic Sorocaba Center", "active": true}'::jsonb
+        NULL
     ),
     (
         '00000000-0000-4000-8000-000000000014',
@@ -186,8 +187,8 @@ VALUES
         'UPDATE',
         'b0000000-0000-4000-8000-000000000009',
         'a0000000-0000-4000-8000-000000000005',
-        '{"active": true, "capacity": 200}'::jsonb,
-        '{"active": true, "capacity": 250}'::jsonb
+        NULL,
+        NULL
     ),
     (
         '00000000-0000-4000-8000-000000000015',
@@ -197,7 +198,7 @@ VALUES
         'DELETE',
         'b0000000-0000-4000-8000-000000000010',
         'a0000000-0000-4000-8000-000000000005',
-        '{"notice_id": "SYN-NOTICE-TEMP-001", "status": "archived"}'::jsonb,
+        NULL,
         NULL
     )
 ON CONFLICT (id) DO NOTHING;
