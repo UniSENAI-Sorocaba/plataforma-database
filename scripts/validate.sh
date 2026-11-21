@@ -435,4 +435,17 @@ BEGIN
 END $$;
 EOF
 
+echo "[validate] 24. Validando avaliações e vínculos autorizados (DB-009)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(table_schema || '.' || table_name, ',' ORDER BY table_schema, table_name) FROM information_schema.tables WHERE (table_schema = 'academic_pi' AND table_name IN ('evaluation', 'evaluation_evaluator'));" \
+  | grep -qx 'academic_pi.evaluation,academic_pi.evaluation_evaluator'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(indexname, ',' ORDER BY indexname) FROM pg_indexes WHERE schemaname = 'academic_pi' AND indexname IN ('idx_evaluation_evaluator','idx_evaluation_project_period');" \
+  | grep -qx 'idx_evaluation_evaluator,idx_evaluation_project_period'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM pg_trigger WHERE tgname IN ('evaluation_target_validation_trigger','evaluation_evaluator_validation_trigger');" \
+  | grep -qx '2'
+
 echo "[validate] Todas as validacoes de compatibilidade, integridade, constraints e seeds concluidas com sucesso!"
