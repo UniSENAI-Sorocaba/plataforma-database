@@ -448,4 +448,20 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NA
   "SELECT count(*) FROM pg_trigger WHERE tgname IN ('evaluation_target_validation_trigger','evaluation_evaluator_validation_trigger');" \
   | grep -qx '2'
 
+echo "[validate] 25. Validando metadados e índices do catálogo público (F5/T19)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM public.schema_migration WHERE version = 'V0017';" | grep -qx '1'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(column_name, ',' ORDER BY column_name) FROM information_schema.columns WHERE table_schema = 'academic_pi' AND table_name = 'project' AND column_name IN ('course_code','ods_codes');" \
+  | grep -qx 'course_code,ods_codes'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(indexname, ',' ORDER BY indexname) FROM pg_indexes WHERE schemaname = 'academic_pi' AND indexname IN ('idx_project_public_catalog_filter','idx_project_public_catalog_ods');" \
+  | grep -qx 'idx_project_public_catalog_filter,idx_project_public_catalog_ods'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM pg_constraint WHERE conname IN ('project_course_code_ck','project_ods_codes_ck');" \
+  | grep -qx '2'
+
 echo "[validate] Todas as validacoes de compatibilidade, integridade, constraints e seeds concluidas com sucesso!"
