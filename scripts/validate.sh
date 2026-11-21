@@ -379,4 +379,60 @@ BEGIN
 END $$;
 EOF
 
+echo "[validate] 23. Validando atividades e horas de Extensao (DB-013)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT table_name FROM information_schema.tables WHERE table_schema = 'extension' AND table_name = 'activity';" | grep -qx 'activity'
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM public.schema_migration WHERE version = 'V0013';" | grep -qx '1'
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid = 'extension.activity'::regclass AND contype = 'c';" \
+  | grep -qx 'activity_approved_hours_ck,activity_description_ck,activity_requested_hours_ck,activity_review_state_ck,activity_status_ck,activity_title_ck'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" <<'EOF'
+DO $$
+DECLARE
+  v_teacher uuid := 'f0000000-0000-4000-8000-000000000071';
+  v_student uuid := 'f0000000-0000-4000-8000-000000000072';
+  v_project uuid := 'f0000000-0000-4000-8000-000000000073';
+  v_period uuid := 'f0000000-0000-4000-8000-000000000074';
+  v_activity uuid := 'f0000000-0000-4000-8000-000000000075';
+BEGIN
+  INSERT INTO auth."user" (id, email, full_name, status)
+  VALUES (v_teacher, 'hours.teacher@synthetic.local', 'Hours Teacher', 'active'),
+         (v_student, 'hours.student@synthetic.local', 'Hours Student', 'active');
+  INSERT INTO academic_pi.project (id, title, summary, description, classification, continuity, publication_status, created_by)
+  VALUES (v_project, 'Projeto de Horas', 'Resumo do projeto de horas', repeat('Descricao do projeto de horas. ', 3), 'EXTENSION', 'CONTINUOUS', 'PUBLISHED', v_teacher);
+  INSERT INTO academic_pi.project_responsible (project_id, user_id) VALUES (v_project, v_teacher);
+  INSERT INTO academic_pi.enrollment_period (id, project_id, academic_term, starts_at, ends_at, created_by)
+  VALUES (v_period, v_project, '2026.2', '2026-01-01T00:00:00Z', '2026-12-31T00:00:00Z', v_teacher);
+  INSERT INTO academic_pi.project_participant (project_id, period_id, student_id) VALUES (v_project, v_period, v_student);
+  INSERT INTO extension.activity
+      (id, project_id, period_id, student_id, title, description, requested_hours, approved_hours, status, reviewed_at, reviewed_by)
+  VALUES (v_activity, v_project, v_period, v_student, 'Atividade de teste', 'Descricao suficiente da atividade de teste.', 4.00, 3.25, 'APPROVED', now(), v_teacher);
+
+  IF (SELECT COALESCE(sum(approved_hours), 0) FROM extension.activity
+      WHERE project_id = v_project AND period_id = v_period AND student_id = v_student AND status = 'APPROVED') <> 3.25 THEN
+    RAISE EXCEPTION 'Total de horas aprovadas inconsistente';
+  END IF;
+
+  BEGIN
+    INSERT INTO extension.activity
+        (id, project_id, period_id, student_id, title, description, requested_hours)
+    VALUES ('f0000000-0000-4000-8000-000000000076', v_project, v_period, v_student,
+            'Atividade de teste', 'Outra descricao suficiente para o teste.', 1.00);
+    RAISE EXCEPTION 'Duplicidade de atividade nao foi bloqueada';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  DELETE FROM extension.activity WHERE project_id = v_project;
+  DELETE FROM academic_pi.project_participant WHERE project_id = v_project;
+  DELETE FROM academic_pi.enrollment_period WHERE id = v_period;
+  ALTER TABLE academic_pi.project_responsible DISABLE TRIGGER project_responsible_minimum_trigger;
+  DELETE FROM academic_pi.project WHERE id = v_project;
+  ALTER TABLE academic_pi.project_responsible ENABLE TRIGGER project_responsible_minimum_trigger;
+  DELETE FROM auth."user" WHERE id IN (v_teacher, v_student);
+END $$;
+EOF
+
 echo "[validate] Todas as validacoes de compatibilidade, integridade, constraints e seeds concluidas com sucesso!"
