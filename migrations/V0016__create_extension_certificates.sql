@@ -1,4 +1,4 @@
--- Migration: V0015 - Certificados públicos verificáveis (F4/T18)
+-- Migration: V0016 - Certificados públicos verificáveis (F4/T18)
 BEGIN;
 
 CREATE TABLE IF NOT EXISTS extension.certificate (
@@ -24,7 +24,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_certificate_participant
     ON extension.certificate (project_id, period_id, student_id);
 
 INSERT INTO public.schema_migration (version, description)
-VALUES ('V0015', 'create public verifiable extension certificates')
+VALUES ('V0016', 'create public verifiable extension certificates')
 ON CONFLICT (version) DO NOTHING;
 
 COMMIT;
