@@ -464,4 +464,14 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NA
   "SELECT count(*) FROM pg_constraint WHERE conname IN ('project_course_code_ck','project_ods_codes_ck');" \
   | grep -qx '2'
 
+echo "[validate] 26. Validando workflow versionado de impacto (F5/T20)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM public.schema_migration WHERE version = 'V0018';" | grep -qx '1'
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(table_name, ',' ORDER BY table_name) FROM information_schema.tables WHERE table_schema = 'academic_pi' AND table_name IN ('impact','impact_version');" \
+  | grep -qx 'impact,impact_version'
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM pg_constraint WHERE conname IN ('impact_status_ck','impact_review_ck','impact_version_positive_ck','uk_impact_version');" \
+  | grep -qx '4'
+
 echo "[validate] Todas as validacoes de compatibilidade, integridade, constraints e seeds concluidas com sucesso!"
