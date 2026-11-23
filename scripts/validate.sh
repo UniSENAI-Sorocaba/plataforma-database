@@ -419,7 +419,7 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NA
 echo "[validate] 25. Validando indices das tabelas de projeto..."
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
   "SELECT string_agg(indexname, ',' ORDER BY indexname) FROM pg_indexes WHERE schemaname = 'academic_pi' AND tablename IN ('project', 'enrollment_period', 'project_instructor', 'project_participation') AND indexname LIKE 'idx_%';" \
-  | grep -qx 'idx_enrollment_period_project_id,idx_project_instructor_instructor_id,idx_project_participation_student_active_extension,idx_project_participation_student_active_pi,idx_project_participation_student_id'
+  | grep -qx 'idx_enrollment_period_project_id,idx_project_instructor_instructor_id,idx_project_participation_student_active_extension,idx_project_participation_student_active_pi,idx_project_participation_student_id,idx_project_public_title'
 
 echo "[validate] 26. Validando regras funcionais e de integridade das tabelas de projeto (DO block)..."
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" <<'EOF'

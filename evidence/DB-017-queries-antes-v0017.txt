@@ -1,0 +1,380 @@
+===== REPETICAO 1 - ANTES V0017 =====
+Pager usage is off.
+=== Q1 completa: portal publico, projetos publicados e publicos, ordenados por titulo (itens 29 e 35) ===
+                                                   QUERY PLAN
+----------------------------------------------------------------------------------------------------------------
+ Sort  (cost=854.50..859.00 rows=1802 width=37) (actual time=4.321..4.421 rows=3002 loops=1)
+   Sort Key: title
+   Sort Method: quicksort  Memory: 284kB
+   Buffers: shared hit=385
+   ->  Seq Scan on project  (cost=0.00..757.05 rows=1802 width=37) (actual time=0.013..2.057 rows=3002 loops=1)
+         Filter: (is_public AND ((status)::text = 'published'::text))
+         Rows Removed by Filter: 27002
+         Buffers: shared hit=382
+ Planning:
+   Buffers: shared hit=87 dirtied=1
+ Planning Time: 0.406 ms
+ Execution Time: 4.546 ms
+(12 rows)
+
+=== Q1 paginada: portal publico, mesmos filtros e ordenacao, LIMIT 20 (itens 29 e 35) ===
+                                                      QUERY PLAN
+----------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=805.00..805.05 rows=20 width=37) (actual time=1.976..1.978 rows=20 loops=1)
+   Buffers: shared hit=382
+   ->  Sort  (cost=805.00..809.51 rows=1802 width=37) (actual time=1.975..1.976 rows=20 loops=1)
+         Sort Key: title
+         Sort Method: top-N heapsort  Memory: 27kB
+         Buffers: shared hit=382
+         ->  Seq Scan on project  (cost=0.00..757.05 rows=1802 width=37) (actual time=0.004..1.550 rows=3002 loops=1)
+               Filter: (is_public AND ((status)::text = 'published'::text))
+               Rows Removed by Filter: 27002
+               Buffers: shared hit=382
+ Planning Time: 0.033 ms
+ Execution Time: 2.004 ms
+(12 rows)
+
+=== Q2: participacoes ativas de um aluno (itens 31 e 32) ===
+                                                                          QUERY PLAN
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Index Scan using idx_project_participation_student_id on project_participation  (cost=0.42..15.58 rows=2 width=42) (actual time=0.022..0.030 rows=2 loops=1)
+   Index Cond: (student_id = 'e1000000-0000-4000-8000-000000001234'::uuid)
+   Filter: ((status)::text = ANY ('{requested,approved}'::text[]))
+   Rows Removed by Filter: 1
+   Buffers: shared hit=6
+ Planning:
+   Buffers: shared hit=129
+ Planning Time: 0.763 ms
+ Execution Time: 0.043 ms
+(9 rows)
+
+=== Q3: solicitacoes pendentes de um projeto, tela de aprovacao do docente (itens 30 e 31) ===
+                                                                        QUERY PLAN
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=154.71..154.71 rows=2 width=40) (actual time=0.255..0.256 rows=25 loops=1)
+   Sort Key: requested_at
+   Sort Method: quicksort  Memory: 26kB
+   Buffers: shared hit=56
+   ->  Bitmap Heap Scan on project_participation  (cost=4.72..154.70 rows=2 width=40) (actual time=0.043..0.229 rows=25 loops=1)
+         Recheck Cond: (project_id = 'e2000000-0000-4000-8000-000000000013'::uuid)
+         Filter: ((status)::text = 'requested'::text)
+         Rows Removed by Filter: 25
+         Heap Blocks: exact=50
+         Buffers: shared hit=53
+         ->  Bitmap Index Scan on project_participation_project_student_unq  (cost=0.00..4.72 rows=39 width=0) (actual time=0.031..0.031 rows=50 loops=1)
+               Index Cond: (project_id = 'e2000000-0000-4000-8000-000000000013'::uuid)
+               Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=14
+ Planning Time: 0.135 ms
+ Execution Time: 0.287 ms
+(17 rows)
+
+=== Q4: projetos de um docente com periodo aberto na data de referencia (itens 31 e 36) ===
+                                                                          QUERY PLAN
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Nested Loop  (cost=5.19..468.72 rows=26 width=51) (actual time=0.580..0.580 rows=0 loops=1)
+   Buffers: shared hit=214
+   ->  Nested Loop  (cost=4.90..449.39 rows=42 width=51) (actual time=0.032..0.330 rows=30 loops=1)
+         Buffers: shared hit=122
+         ->  Bitmap Heap Scan on project_instructor pin  (cost=4.62..132.58 rows=42 width=16) (actual time=0.018..0.119 rows=30 loops=1)
+               Recheck Cond: (instructor_id = 'e1000000-0000-4000-8000-000000250007'::uuid)
+               Heap Blocks: exact=30
+               Buffers: shared hit=32
+               ->  Bitmap Index Scan on idx_project_instructor_instructor_id  (cost=0.00..4.61 rows=42 width=0) (actual time=0.012..0.012 rows=30 loops=1)
+                     Index Cond: (instructor_id = 'e1000000-0000-4000-8000-000000250007'::uuid)
+                     Buffers: shared hit=2
+         ->  Index Scan using project_pkey on project p  (cost=0.29..7.54 rows=1 width=35) (actual time=0.007..0.007 rows=1 loops=30)
+               Index Cond: (id = pin.project_id)
+               Buffers: shared hit=90
+   ->  Index Scan using idx_enrollment_period_project_id on enrollment_period e  (cost=0.29..0.45 rows=1 width=32) (actual time=0.008..0.008 rows=0 loops=30)
+         Index Cond: (project_id = p.id)
+         Filter: ((opens_at <= '2026-11-20 15:00:00+00'::timestamp with time zone) AND (closes_at >= '2026-11-20 15:00:00+00'::timestamp with time zone))
+         Rows Removed by Filter: 2
+         Buffers: shared hit=92
+ Planning:
+   Buffers: shared hit=109
+ Planning Time: 1.035 ms
+ Execution Time: 0.628 ms
+(23 rows)
+
+=== Q5: projetos publicados com periodo aberto na data de referencia (itens 31 e 36) ===
+                                                                           QUERY PLAN
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=3368.70..3396.77 rows=11229 width=43) (actual time=9.136..9.279 rows=4500 loops=1)
+   Sort Key: e.closes_at
+   Sort Method: quicksort  Memory: 509kB
+   Buffers: shared hit=1064
+   ->  Hash Join  (cost=982.09..2613.27 rows=11229 width=43) (actual time=4.400..8.465 rows=4500 loops=1)
+         Hash Cond: (e.project_id = p.id)
+         Buffers: shared hit=1064
+         ->  Seq Scan on enrollment_period e  (cost=0.00..1582.05 rows=18715 width=24) (actual time=0.005..3.091 rows=7500 loops=1)
+               Filter: ((opens_at <= '2026-11-20 15:00:00+00'::timestamp with time zone) AND (closes_at >= '2026-11-20 15:00:00+00'::timestamp with time zone))
+               Rows Removed by Filter: 52503
+               Buffers: shared hit=682
+         ->  Hash  (cost=757.05..757.05 rows=18003 width=35) (actual time=4.315..4.315 rows=18002 loops=1)
+               Buckets: 32768  Batches: 1  Memory Usage: 1445kB
+               Buffers: shared hit=382
+               ->  Seq Scan on project p  (cost=0.00..757.05 rows=18003 width=35) (actual time=0.002..2.319 rows=18002 loops=1)
+                     Filter: ((status)::text = 'published'::text)
+                     Rows Removed by Filter: 12002
+                     Buffers: shared hit=382
+ Planning:
+   Buffers: shared hit=12
+ Planning Time: 0.183 ms
+ Execution Time: 9.642 ms
+(22 rows)
+
+===== REPETICAO 2 - ANTES V0017 =====
+Pager usage is off.
+=== Q1 completa: portal publico, projetos publicados e publicos, ordenados por titulo (itens 29 e 35) ===
+                                                   QUERY PLAN
+----------------------------------------------------------------------------------------------------------------
+ Sort  (cost=854.50..859.00 rows=1802 width=37) (actual time=4.422..4.515 rows=3002 loops=1)
+   Sort Key: title
+   Sort Method: quicksort  Memory: 284kB
+   Buffers: shared hit=385
+   ->  Seq Scan on project  (cost=0.00..757.05 rows=1802 width=37) (actual time=0.012..2.068 rows=3002 loops=1)
+         Filter: (is_public AND ((status)::text = 'published'::text))
+         Rows Removed by Filter: 27002
+         Buffers: shared hit=382
+ Planning:
+   Buffers: shared hit=73
+ Planning Time: 0.317 ms
+ Execution Time: 4.679 ms
+(12 rows)
+
+=== Q1 paginada: portal publico, mesmos filtros e ordenacao, LIMIT 20 (itens 29 e 35) ===
+                                                      QUERY PLAN
+----------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=805.00..805.05 rows=20 width=37) (actual time=1.922..1.924 rows=20 loops=1)
+   Buffers: shared hit=382
+   ->  Sort  (cost=805.00..809.51 rows=1802 width=37) (actual time=1.921..1.922 rows=20 loops=1)
+         Sort Key: title
+         Sort Method: top-N heapsort  Memory: 27kB
+         Buffers: shared hit=382
+         ->  Seq Scan on project  (cost=0.00..757.05 rows=1802 width=37) (actual time=0.005..1.505 rows=3002 loops=1)
+               Filter: (is_public AND ((status)::text = 'published'::text))
+               Rows Removed by Filter: 27002
+               Buffers: shared hit=382
+ Planning Time: 0.037 ms
+ Execution Time: 1.950 ms
+(12 rows)
+
+=== Q2: participacoes ativas de um aluno (itens 31 e 32) ===
+                                                                          QUERY PLAN
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Index Scan using idx_project_participation_student_id on project_participation  (cost=0.42..15.58 rows=2 width=42) (actual time=0.021..0.029 rows=2 loops=1)
+   Index Cond: (student_id = 'e1000000-0000-4000-8000-000000001234'::uuid)
+   Filter: ((status)::text = ANY ('{requested,approved}'::text[]))
+   Rows Removed by Filter: 1
+   Buffers: shared hit=6
+ Planning:
+   Buffers: shared hit=129
+ Planning Time: 0.772 ms
+ Execution Time: 0.041 ms
+(9 rows)
+
+=== Q3: solicitacoes pendentes de um projeto, tela de aprovacao do docente (itens 30 e 31) ===
+                                                                        QUERY PLAN
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=154.71..154.71 rows=2 width=40) (actual time=0.224..0.225 rows=25 loops=1)
+   Sort Key: requested_at
+   Sort Method: quicksort  Memory: 26kB
+   Buffers: shared hit=56
+   ->  Bitmap Heap Scan on project_participation  (cost=4.72..154.70 rows=2 width=40) (actual time=0.042..0.190 rows=25 loops=1)
+         Recheck Cond: (project_id = 'e2000000-0000-4000-8000-000000000013'::uuid)
+         Filter: ((status)::text = 'requested'::text)
+         Rows Removed by Filter: 25
+         Heap Blocks: exact=50
+         Buffers: shared hit=53
+         ->  Bitmap Index Scan on project_participation_project_student_unq  (cost=0.00..4.72 rows=39 width=0) (actual time=0.030..0.030 rows=50 loops=1)
+               Index Cond: (project_id = 'e2000000-0000-4000-8000-000000000013'::uuid)
+               Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=14
+ Planning Time: 0.146 ms
+ Execution Time: 0.261 ms
+(17 rows)
+
+=== Q4: projetos de um docente com periodo aberto na data de referencia (itens 31 e 36) ===
+                                                                          QUERY PLAN
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Nested Loop  (cost=5.19..468.72 rows=26 width=51) (actual time=0.585..0.587 rows=0 loops=1)
+   Buffers: shared hit=214
+   ->  Nested Loop  (cost=4.90..449.39 rows=42 width=51) (actual time=0.032..0.314 rows=30 loops=1)
+         Buffers: shared hit=122
+         ->  Bitmap Heap Scan on project_instructor pin  (cost=4.62..132.58 rows=42 width=16) (actual time=0.018..0.118 rows=30 loops=1)
+               Recheck Cond: (instructor_id = 'e1000000-0000-4000-8000-000000250007'::uuid)
+               Heap Blocks: exact=30
+               Buffers: shared hit=32
+               ->  Bitmap Index Scan on idx_project_instructor_instructor_id  (cost=0.00..4.61 rows=42 width=0) (actual time=0.012..0.012 rows=30 loops=1)
+                     Index Cond: (instructor_id = 'e1000000-0000-4000-8000-000000250007'::uuid)
+                     Buffers: shared hit=2
+         ->  Index Scan using project_pkey on project p  (cost=0.29..7.54 rows=1 width=35) (actual time=0.006..0.006 rows=1 loops=30)
+               Index Cond: (id = pin.project_id)
+               Buffers: shared hit=90
+   ->  Index Scan using idx_enrollment_period_project_id on enrollment_period e  (cost=0.29..0.45 rows=1 width=32) (actual time=0.009..0.009 rows=0 loops=30)
+         Index Cond: (project_id = p.id)
+         Filter: ((opens_at <= '2026-11-20 15:00:00+00'::timestamp with time zone) AND (closes_at >= '2026-11-20 15:00:00+00'::timestamp with time zone))
+         Rows Removed by Filter: 2
+         Buffers: shared hit=92
+ Planning:
+   Buffers: shared hit=109
+ Planning Time: 1.669 ms
+ Execution Time: 0.654 ms
+(23 rows)
+
+=== Q5: projetos publicados com periodo aberto na data de referencia (itens 31 e 36) ===
+                                                                           QUERY PLAN
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=3368.70..3396.77 rows=11229 width=43) (actual time=9.622..9.766 rows=4500 loops=1)
+   Sort Key: e.closes_at
+   Sort Method: quicksort  Memory: 509kB
+   Buffers: shared hit=1064
+   ->  Hash Join  (cost=982.09..2613.27 rows=11229 width=43) (actual time=4.611..8.934 rows=4500 loops=1)
+         Hash Cond: (e.project_id = p.id)
+         Buffers: shared hit=1064
+         ->  Seq Scan on enrollment_period e  (cost=0.00..1582.05 rows=18715 width=24) (actual time=0.006..3.220 rows=7500 loops=1)
+               Filter: ((opens_at <= '2026-11-20 15:00:00+00'::timestamp with time zone) AND (closes_at >= '2026-11-20 15:00:00+00'::timestamp with time zone))
+               Rows Removed by Filter: 52503
+               Buffers: shared hit=682
+         ->  Hash  (cost=757.05..757.05 rows=18003 width=35) (actual time=4.511..4.512 rows=18002 loops=1)
+               Buckets: 32768  Batches: 1  Memory Usage: 1445kB
+               Buffers: shared hit=382
+               ->  Seq Scan on project p  (cost=0.00..757.05 rows=18003 width=35) (actual time=0.003..2.356 rows=18002 loops=1)
+                     Filter: ((status)::text = 'published'::text)
+                     Rows Removed by Filter: 12002
+                     Buffers: shared hit=382
+ Planning:
+   Buffers: shared hit=12
+ Planning Time: 0.214 ms
+ Execution Time: 10.145 ms
+(22 rows)
+
+===== REPETICAO 3 - ANTES V0017 =====
+Pager usage is off.
+=== Q1 completa: portal publico, projetos publicados e publicos, ordenados por titulo (itens 29 e 35) ===
+                                                   QUERY PLAN
+----------------------------------------------------------------------------------------------------------------
+ Sort  (cost=854.50..859.00 rows=1802 width=37) (actual time=4.297..4.390 rows=3002 loops=1)
+   Sort Key: title
+   Sort Method: quicksort  Memory: 284kB
+   Buffers: shared hit=385
+   ->  Seq Scan on project  (cost=0.00..757.05 rows=1802 width=37) (actual time=0.012..2.000 rows=3002 loops=1)
+         Filter: (is_public AND ((status)::text = 'published'::text))
+         Rows Removed by Filter: 27002
+         Buffers: shared hit=382
+ Planning:
+   Buffers: shared hit=73
+ Planning Time: 0.319 ms
+ Execution Time: 4.529 ms
+(12 rows)
+
+=== Q1 paginada: portal publico, mesmos filtros e ordenacao, LIMIT 20 (itens 29 e 35) ===
+                                                      QUERY PLAN
+----------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=805.00..805.05 rows=20 width=37) (actual time=2.067..2.069 rows=20 loops=1)
+   Buffers: shared hit=382
+   ->  Sort  (cost=805.00..809.51 rows=1802 width=37) (actual time=2.066..2.067 rows=20 loops=1)
+         Sort Key: title
+         Sort Method: top-N heapsort  Memory: 27kB
+         Buffers: shared hit=382
+         ->  Seq Scan on project  (cost=0.00..757.05 rows=1802 width=37) (actual time=0.004..1.641 rows=3002 loops=1)
+               Filter: (is_public AND ((status)::text = 'published'::text))
+               Rows Removed by Filter: 27002
+               Buffers: shared hit=382
+ Planning Time: 0.047 ms
+ Execution Time: 2.112 ms
+(12 rows)
+
+=== Q2: participacoes ativas de um aluno (itens 31 e 32) ===
+                                                                          QUERY PLAN
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Index Scan using idx_project_participation_student_id on project_participation  (cost=0.42..15.58 rows=2 width=42) (actual time=0.022..0.028 rows=2 loops=1)
+   Index Cond: (student_id = 'e1000000-0000-4000-8000-000000001234'::uuid)
+   Filter: ((status)::text = ANY ('{requested,approved}'::text[]))
+   Rows Removed by Filter: 1
+   Buffers: shared hit=6
+ Planning:
+   Buffers: shared hit=129
+ Planning Time: 0.974 ms
+ Execution Time: 0.040 ms
+(9 rows)
+
+=== Q3: solicitacoes pendentes de um projeto, tela de aprovacao do docente (itens 30 e 31) ===
+                                                                        QUERY PLAN
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=154.71..154.71 rows=2 width=40) (actual time=0.157..0.158 rows=25 loops=1)
+   Sort Key: requested_at
+   Sort Method: quicksort  Memory: 26kB
+   Buffers: shared hit=56
+   ->  Bitmap Heap Scan on project_participation  (cost=4.72..154.70 rows=2 width=40) (actual time=0.027..0.139 rows=25 loops=1)
+         Recheck Cond: (project_id = 'e2000000-0000-4000-8000-000000000013'::uuid)
+         Filter: ((status)::text = 'requested'::text)
+         Rows Removed by Filter: 25
+         Heap Blocks: exact=50
+         Buffers: shared hit=53
+         ->  Bitmap Index Scan on project_participation_project_student_unq  (cost=0.00..4.72 rows=39 width=0) (actual time=0.020..0.020 rows=50 loops=1)
+               Index Cond: (project_id = 'e2000000-0000-4000-8000-000000000013'::uuid)
+               Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=14
+ Planning Time: 0.094 ms
+ Execution Time: 0.182 ms
+(17 rows)
+
+=== Q4: projetos de um docente com periodo aberto na data de referencia (itens 31 e 36) ===
+                                                                          QUERY PLAN
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Nested Loop  (cost=5.19..468.72 rows=26 width=51) (actual time=0.427..0.428 rows=0 loops=1)
+   Buffers: shared hit=214
+   ->  Nested Loop  (cost=4.90..449.39 rows=42 width=51) (actual time=0.028..0.243 rows=30 loops=1)
+         Buffers: shared hit=122
+         ->  Bitmap Heap Scan on project_instructor pin  (cost=4.62..132.58 rows=42 width=16) (actual time=0.018..0.099 rows=30 loops=1)
+               Recheck Cond: (instructor_id = 'e1000000-0000-4000-8000-000000250007'::uuid)
+               Heap Blocks: exact=30
+               Buffers: shared hit=32
+               ->  Bitmap Index Scan on idx_project_instructor_instructor_id  (cost=0.00..4.61 rows=42 width=0) (actual time=0.012..0.012 rows=30 loops=1)
+                     Index Cond: (instructor_id = 'e1000000-0000-4000-8000-000000250007'::uuid)
+                     Buffers: shared hit=2
+         ->  Index Scan using project_pkey on project p  (cost=0.29..7.54 rows=1 width=35) (actual time=0.004..0.004 rows=1 loops=30)
+               Index Cond: (id = pin.project_id)
+               Buffers: shared hit=90
+   ->  Index Scan using idx_enrollment_period_project_id on enrollment_period e  (cost=0.29..0.45 rows=1 width=32) (actual time=0.006..0.006 rows=0 loops=30)
+         Index Cond: (project_id = p.id)
+         Filter: ((opens_at <= '2026-11-20 15:00:00+00'::timestamp with time zone) AND (closes_at >= '2026-11-20 15:00:00+00'::timestamp with time zone))
+         Rows Removed by Filter: 2
+         Buffers: shared hit=92
+ Planning:
+   Buffers: shared hit=109
+ Planning Time: 0.734 ms
+ Execution Time: 0.477 ms
+(23 rows)
+
+=== Q5: projetos publicados com periodo aberto na data de referencia (itens 31 e 36) ===
+                                                                           QUERY PLAN
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=3368.70..3396.77 rows=11229 width=43) (actual time=9.023..9.165 rows=4500 loops=1)
+   Sort Key: e.closes_at
+   Sort Method: quicksort  Memory: 509kB
+   Buffers: shared hit=1064
+   ->  Hash Join  (cost=982.09..2613.27 rows=11229 width=43) (actual time=4.521..8.371 rows=4500 loops=1)
+         Hash Cond: (e.project_id = p.id)
+         Buffers: shared hit=1064
+         ->  Seq Scan on enrollment_period e  (cost=0.00..1582.05 rows=18715 width=24) (actual time=0.004..2.773 rows=7500 loops=1)
+               Filter: ((opens_at <= '2026-11-20 15:00:00+00'::timestamp with time zone) AND (closes_at >= '2026-11-20 15:00:00+00'::timestamp with time zone))
+               Rows Removed by Filter: 52503
+               Buffers: shared hit=682
+         ->  Hash  (cost=757.05..757.05 rows=18003 width=35) (actual time=4.439..4.440 rows=18002 loops=1)
+               Buckets: 32768  Batches: 1  Memory Usage: 1445kB
+               Buffers: shared hit=382
+               ->  Seq Scan on project p  (cost=0.00..757.05 rows=18003 width=35) (actual time=0.002..2.323 rows=18002 loops=1)
+                     Filter: ((status)::text = 'published'::text)
+                     Rows Removed by Filter: 12002
+                     Buffers: shared hit=382
+ Planning:
+   Buffers: shared hit=12
+ Planning Time: 0.201 ms
+ Execution Time: 9.536 ms
+(22 rows)
