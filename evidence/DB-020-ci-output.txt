@@ -1,0 +1,557 @@
+# Evidencia de execucao verbatim da CI Database (GitHub Actions)
+# Repositorio: UniSENAI-Sorocaba/plataforma-database
+# Branch: feat/DB-020-dictionary-and-runbook
+# Commit: 628a4aaa5bfa8999e25e70e5233b2e7e09027ca1
+# Data UTC: 2026-11-24T15:31:36Z
+# Workflow Run ID: 45426523151
+# Imagem PostgreSQL: postgres:16-alpine
+
+﻿2026-11-24T15:31:42.6485328Z ##[group]Run make up
+2026-11-24T15:31:42.6485916Z ^[[36;1mmake up^[[0m
+2026-11-24T15:31:42.6519776Z shell: /usr/bin/bash -e {0}
+2026-11-24T15:31:42.6520279Z ##[endgroup]
+2026-11-24T15:31:42.6615868Z docker compose up -d --wait
+2026-11-24T15:31:42.8702595Z  Image postgres:16-alpine Pulling 
+2026-11-24T15:31:46.1796377Z  Image postgres:16-alpine Pulled 
+2026-11-24T15:31:46.2165616Z  Network plataforma-database_default Creating 
+2026-11-24T15:31:46.2417029Z  Network plataforma-database_default Created 
+2026-11-24T15:31:46.2421528Z  Volume plataforma-database_database-data Creating 
+2026-11-24T15:31:46.2431420Z  Volume plataforma-database_database-data Created 
+2026-11-24T15:31:46.2444197Z  Container plataforma-database-postgres-1 Creating 
+2026-11-24T15:31:49.1559774Z  Container plataforma-database-postgres-1 Created 
+2026-11-24T15:31:49.1675458Z  Container plataforma-database-postgres-1 Starting 
+2026-11-24T15:31:49.3388098Z  Container plataforma-database-postgres-1 Started 
+2026-11-24T15:31:49.3388715Z  Container plataforma-database-postgres-1 Waiting 
+2026-11-24T15:31:51.8399709Z  Container plataforma-database-postgres-1 Healthy 
+﻿2026-11-24T15:31:51.8479446Z ##[group]Run make migrate
+2026-11-24T15:31:51.8479683Z ^[[36;1mmake migrate^[[0m
+2026-11-24T15:31:51.8510405Z shell: /usr/bin/bash -e {0}
+2026-11-24T15:31:51.8510626Z ##[endgroup]
+2026-11-24T15:31:51.8568629Z ./scripts/migrate.sh
+2026-11-24T15:31:51.9599448Z Aplicando migration migrations/V0001__create_domain_schemas.sql em plataforma...
+2026-11-24T15:31:52.0483186Z BEGIN
+2026-11-24T15:31:52.0487482Z CREATE SCHEMA
+2026-11-24T15:31:52.0488591Z CREATE SCHEMA
+2026-11-24T15:31:52.0490781Z CREATE SCHEMA
+2026-11-24T15:31:52.0491866Z CREATE SCHEMA
+2026-11-24T15:31:52.0493109Z CREATE SCHEMA
+2026-11-24T15:31:52.0564105Z CREATE TABLE
+2026-11-24T15:31:52.0569069Z INSERT 0 1
+2026-11-24T15:31:52.0571783Z COMMIT
+2026-11-24T15:31:52.2586202Z Aplicando migration migrations/V0002__create_audit_event.sql em plataforma...
+2026-11-24T15:31:52.3585654Z BEGIN
+2026-11-24T15:31:52.3662481Z CREATE TABLE
+2026-11-24T15:31:52.3683362Z CREATE INDEX
+2026-11-24T15:31:52.3699092Z CREATE INDEX
+2026-11-24T15:31:52.3710682Z CREATE INDEX
+2026-11-24T15:31:52.3716646Z INSERT 0 1
+2026-11-24T15:31:52.3719371Z COMMIT
+2026-11-24T15:31:52.5800843Z Aplicando migration migrations/V0003__create_identity_user_and_academic_link.sql em plataforma...
+2026-11-24T15:31:52.6673498Z BEGIN
+2026-11-24T15:31:52.6778853Z CREATE TABLE
+2026-11-24T15:31:52.6788657Z CREATE INDEX
+2026-11-24T15:31:52.6798560Z CREATE INDEX
+2026-11-24T15:31:52.6808230Z CREATE INDEX
+2026-11-24T15:31:52.6866358Z CREATE TABLE
+2026-11-24T15:31:52.6876492Z CREATE INDEX
+2026-11-24T15:31:52.6887721Z CREATE INDEX
+2026-11-24T15:31:52.6919801Z CREATE TABLE
+2026-11-24T15:31:52.6928727Z CREATE INDEX
+2026-11-24T15:31:52.6938274Z CREATE INDEX
+2026-11-24T15:31:52.6949246Z CREATE INDEX
+2026-11-24T15:31:52.6998511Z CREATE TABLE
+2026-11-24T15:31:52.7010830Z CREATE INDEX
+2026-11-24T15:31:52.7020726Z CREATE INDEX
+2026-11-24T15:31:52.7031616Z CREATE INDEX
+2026-11-24T15:31:52.7036548Z INSERT 0 1
+2026-11-24T15:31:52.7039823Z COMMIT
+2026-11-24T15:31:52.9094863Z Aplicando migration migrations/V0004__create_user_session.sql em plataforma...
+2026-11-24T15:31:52.9950652Z BEGIN
+2026-11-24T15:31:53.0061193Z CREATE TABLE
+2026-11-24T15:31:53.0071964Z CREATE INDEX
+2026-11-24T15:31:53.0083143Z CREATE INDEX
+2026-11-24T15:31:53.0100540Z CREATE INDEX
+2026-11-24T15:31:53.0105148Z INSERT 0 1
+2026-11-24T15:31:53.0109346Z COMMIT
+2026-11-24T15:31:53.2130709Z Aplicando migration migrations/V0006__create_rbac_schema.sql em plataforma...
+2026-11-24T15:31:53.3019582Z BEGIN
+2026-11-24T15:31:53.3095896Z CREATE TABLE
+2026-11-24T15:31:53.3142494Z CREATE TABLE
+2026-11-24T15:31:53.3175925Z CREATE TABLE
+2026-11-24T15:31:53.3259719Z CREATE TABLE
+2026-11-24T15:31:53.3285202Z DO
+2026-11-24T15:31:53.3307325Z DO
+2026-11-24T15:31:53.3319045Z CREATE INDEX
+2026-11-24T15:31:53.3330518Z CREATE INDEX
+2026-11-24T15:31:53.3339975Z CREATE INDEX
+2026-11-24T15:31:53.3349877Z CREATE INDEX
+2026-11-24T15:31:53.3353764Z INSERT 0 1
+2026-11-24T15:31:53.3356169Z COMMIT
+2026-11-24T15:31:53.5395956Z Aplicando migration migrations/V0007__restrict_audit_event_to_technical_records.sql em plataforma...
+2026-11-24T15:31:53.6256769Z BEGIN
+2026-11-24T15:31:53.6274472Z UPDATE 0
+2026-11-24T15:31:53.6276964Z NOTICE:  constraint "audit_event_no_snapshot_ck" of relation "audit_event" does not exist, skipping
+2026-11-24T15:31:53.6278083Z ALTER TABLE
+2026-11-24T15:31:53.6287620Z ALTER TABLE
+2026-11-24T15:31:53.6292830Z COMMENT
+2026-11-24T15:31:53.6293169Z COMMENT
+2026-11-24T15:31:53.6294909Z COMMENT
+2026-11-24T15:31:53.6300723Z INSERT 0 1
+2026-11-24T15:31:53.6303396Z COMMIT
+2026-11-24T15:31:53.8297449Z Aplicando migration migrations/V0008__create_project_tables.sql em plataforma...
+2026-11-24T15:31:53.9148706Z BEGIN
+2026-11-24T15:31:53.9241945Z CREATE TABLE
+2026-11-24T15:31:53.9273439Z CREATE TABLE
+2026-11-24T15:31:53.9286408Z CREATE INDEX
+2026-11-24T15:31:53.9317753Z CREATE TABLE
+2026-11-24T15:31:53.9328819Z CREATE INDEX
+2026-11-24T15:31:53.9385415Z CREATE TABLE
+2026-11-24T15:31:53.9395335Z CREATE INDEX
+2026-11-24T15:31:53.9406665Z CREATE INDEX
+2026-11-24T15:31:53.9417942Z CREATE INDEX
+2026-11-24T15:31:53.9444735Z DO
+2026-11-24T15:31:53.9478368Z DO
+2026-11-24T15:31:53.9481945Z INSERT 0 1
+2026-11-24T15:31:53.9485217Z COMMIT
+2026-11-24T15:31:54.1525701Z Aplicando migration migrations/V0010__create_pi_rubric_and_evaluation.sql em plataforma...
+2026-11-24T15:31:54.2406605Z BEGIN
+2026-11-24T15:31:54.2543662Z CREATE TABLE
+2026-11-24T15:31:54.2554522Z CREATE INDEX
+2026-11-24T15:31:54.2564961Z CREATE INDEX
+2026-11-24T15:31:54.2567918Z COMMENT
+2026-11-24T15:31:54.2569077Z COMMENT
+2026-11-24T15:31:54.2694524Z CREATE TABLE
+2026-11-24T15:31:54.2706576Z CREATE INDEX
+2026-11-24T15:31:54.2717430Z CREATE INDEX
+2026-11-24T15:31:54.2727284Z CREATE INDEX
+2026-11-24T15:31:54.2738880Z CREATE INDEX
+2026-11-24T15:31:54.2739720Z COMMENT
+2026-11-24T15:31:54.2805467Z CREATE TABLE
+2026-11-24T15:31:54.2818478Z CREATE INDEX
+2026-11-24T15:31:54.2829432Z CREATE INDEX
+2026-11-24T15:31:54.2840594Z CREATE INDEX
+2026-11-24T15:31:54.2841825Z COMMENT
+2026-11-24T15:31:54.2843051Z COMMENT
+2026-11-24T15:31:54.2849473Z INSERT 0 1
+2026-11-24T15:31:54.2852851Z COMMIT
+2026-11-24T15:31:54.4879338Z Aplicando migration migrations/V0011__create_project_file_metadata.sql em plataforma...
+2026-11-24T15:31:54.5735669Z BEGIN
+2026-11-24T15:31:54.5783816Z CREATE TABLE
+2026-11-24T15:31:54.5787220Z COMMENT
+2026-11-24T15:31:54.5893313Z CREATE TABLE
+2026-11-24T15:31:54.5904753Z CREATE INDEX
+2026-11-24T15:31:54.5915800Z CREATE INDEX
+2026-11-24T15:31:54.5926826Z CREATE INDEX
+2026-11-24T15:31:54.5936545Z CREATE INDEX
+2026-11-24T15:31:54.5948677Z CREATE INDEX
+2026-11-24T15:31:54.5949632Z COMMENT
+2026-11-24T15:31:54.5955252Z COMMENT
+2026-11-24T15:31:54.5955507Z INSERT 0 1
+2026-11-24T15:31:54.5957587Z COMMIT
+2026-11-24T15:31:54.7974494Z Aplicando migration migrations/V0017__add_public_project_title_index.sql em plataforma...
+2026-11-24T15:31:54.8825685Z BEGIN
+2026-11-24T15:31:54.8871996Z CREATE INDEX
+2026-11-24T15:31:54.8876790Z INSERT 0 1
+2026-11-24T15:31:54.8878850Z COMMIT
+﻿2026-11-24T15:31:54.8968414Z ##[group]Run make seed
+2026-11-24T15:31:54.8968706Z ^[[36;1mmake seed^[[0m
+2026-11-24T15:31:54.8997407Z shell: /usr/bin/bash -e {0}
+2026-11-24T15:31:54.8997645Z ##[endgroup]
+2026-11-24T15:31:54.9053659Z ./scripts/seed.sh
+2026-11-24T15:31:54.9081452Z [seed] Aplicando seeds deterministicos em plataforma...
+2026-11-24T15:31:54.9082087Z [seed] Aplicando seeds/0001_audit_event.sql em plataforma...
+2026-11-24T15:31:55.0043530Z INSERT 0 15
+2026-11-24T15:31:55.0077253Z [seed] Aplicando seeds/0002_identity_user_link.sql em plataforma...
+2026-11-24T15:31:55.0962721Z INSERT 0 5
+2026-11-24T15:31:55.0979459Z INSERT 0 2
+2026-11-24T15:31:55.0990789Z INSERT 0 2
+2026-11-24T15:31:55.1009488Z INSERT 0 5
+2026-11-24T15:31:55.1066986Z [seed] Aplicando seeds/0003_user_session.sql em plataforma...
+2026-11-24T15:31:55.1955208Z INSERT 0 1
+2026-11-24T15:31:55.1964694Z INSERT 0 4
+2026-11-24T15:31:55.2013115Z [seed] Aplicando seeds/0004_rbac_roles_and_scopes.sql em plataforma...
+2026-11-24T15:31:55.2883636Z BEGIN
+2026-11-24T15:31:55.2900875Z INSERT 0 3
+2026-11-24T15:31:55.2909922Z INSERT 0 7
+2026-11-24T15:31:55.2946101Z INSERT 0 2
+2026-11-24T15:31:55.2951841Z INSERT 0 4
+2026-11-24T15:31:55.2955016Z INSERT 0 1
+2026-11-24T15:31:55.2979126Z INSERT 0 1
+2026-11-24T15:31:55.2983237Z INSERT 0 1
+2026-11-24T15:31:55.2987576Z INSERT 0 1
+2026-11-24T15:31:55.2992154Z INSERT 0 1
+2026-11-24T15:31:55.2996463Z INSERT 0 1
+2026-11-24T15:31:55.3001047Z INSERT 0 1
+2026-11-24T15:31:55.3004460Z INSERT 0 1
+2026-11-24T15:31:55.3007840Z COMMIT
+2026-11-24T15:31:55.3061066Z [seed] Aplicando seeds/0005_project_tables.sql em plataforma...
+2026-11-24T15:31:55.3908522Z BEGIN
+2026-11-24T15:31:55.3930520Z INSERT 0 4
+2026-11-24T15:31:55.3945355Z INSERT 0 3
+2026-11-24T15:31:55.3965308Z INSERT 0 3
+2026-11-24T15:31:55.3984699Z INSERT 0 5
+2026-11-24T15:31:55.3992230Z COMMIT
+2026-11-24T15:31:55.4039415Z [seed] 5 arquivo(s) de seed aplicado(s) com sucesso em plataforma.
+﻿2026-11-24T15:31:55.4073084Z ##[group]Run make validate
+2026-11-24T15:31:55.4073326Z ^[[36;1mmake validate^[[0m
+2026-11-24T15:31:55.4102656Z shell: /usr/bin/bash -e {0}
+2026-11-24T15:31:55.4102871Z ##[endgroup]
+2026-11-24T15:31:55.4159302Z ./scripts/validate.sh
+2026-11-24T15:31:55.4187579Z [validate] 1. Validando schemas de dominio em plataforma...
+2026-11-24T15:31:55.5268139Z [validate] 2. Validando tabela public.schema_migration...
+2026-11-24T15:31:55.6274630Z [validate] 3. Validando registro de todas as migrations aplicadas...
+2026-11-24T15:31:55.7506457Z    Todas as migrations da branch registradas com sucesso em plataforma: V0001,V0002,V0003,V0004,V0006,V0007,V0008,V0010,V0011,V0017
+2026-11-24T15:31:55.7507091Z [validate] 4. Validando tabela public.audit_event...
+2026-11-24T15:31:55.8472566Z [validate] 5. Validando indices da tabela public.audit_event...
+2026-11-24T15:31:55.9437318Z [validate] 6. Validando check constraints da tabela public.audit_event...
+2026-11-24T15:31:56.0405054Z [validate] 7. Validando postura de seguranca (sem USAGE/CREATE para PUBLIC)...
+2026-11-24T15:31:56.1347830Z [validate] 8. Validando integridade e funcionamento de constraints em public.audit_event...
+2026-11-24T15:31:56.2202385Z DO
+2026-11-24T15:31:56.2250430Z [validate] 9. Validando presenca e cobertura de seeds deterministicos em public.audit_event...
+2026-11-24T15:31:56.5073895Z [validate] 9.1. Validando que audit_event nao persiste snapshots de valores (DB-007)...
+2026-11-24T15:31:56.7917740Z [validate] 9.2. Validando que nenhuma rotina ou trigger alimenta audit_event (DB-007)...
+2026-11-24T15:31:56.9851670Z [validate] 9.3. Validando comportamento de audit_event sem snapshots (DB-007)...
+2026-11-24T15:31:57.0751873Z DO
+2026-11-24T15:31:57.0799368Z [validate] 10. Validando tabelas de identidade, usuario e vinculo (DB-004)...
+2026-11-24T15:31:57.1780947Z [validate] 11. Validando check constraints de identidade, usuario e vinculo...
+2026-11-24T15:31:57.2720613Z [validate] 12. Validando foreign keys de identidade e vinculo...
+2026-11-24T15:31:57.3646924Z [validate] 13. Validando unique constraints de identidade, usuario e vinculo...
+2026-11-24T15:31:57.4570701Z [validate] 14. Validando indices de identidade, usuario e vinculo...
+2026-11-24T15:31:57.5624605Z [validate] 15. Validando comportamento funcional e regras de integridade (DO block)...
+2026-11-24T15:31:57.6632660Z DO
+2026-11-24T15:31:57.6681775Z [validate] 16. Validando presenca de dados sinteticos nas tabelas DB-004...
+2026-11-24T15:31:58.0425151Z [validate] 17. Validando conformidade Anti-PII e determinismo (sem dados pessoais)...
+2026-11-24T15:31:58.4134575Z [validate] 18. Validando tabela auth.user_session (DB-005)...
+2026-11-24T15:31:58.5085034Z [validate] 19. Validando constraints e foreign keys de auth.user_session...
+2026-11-24T15:31:58.7900829Z [validate] 20. Validando indices de auth.user_session...
+2026-11-24T15:31:58.8867962Z [validate] 21. Validando regras funcionais e de integridade em auth.user_session (DO block)...
+2026-11-24T15:31:58.9852780Z DO
+2026-11-24T15:31:58.9899581Z [validate] 22. Validando presenca de dados sinteticos em auth.user_session...
+2026-11-24T15:31:59.1750953Z [validate] 23. Validando tabelas e registro da migration de projetos (DB-008)...
+2026-11-24T15:31:59.3651374Z [validate] 24. Validando check, unique e foreign keys das tabelas de projeto...
+2026-11-24T15:31:59.6490996Z [validate] 25. Validando indices das tabelas de projeto...
+2026-11-24T15:31:59.7455342Z [validate] 26. Validando regras funcionais e de integridade das tabelas de projeto (DO block)...
+2026-11-24T15:31:59.8522908Z DO
+2026-11-24T15:31:59.8586297Z [validate] 27. Validando tabelas de metadados de arquivos (DB-011)...
+2026-11-24T15:32:00.0551188Z [validate] 28. Validando que o binario nao e armazenado em assets.project_file (DB-011)...
+2026-11-24T15:32:00.1561745Z [validate] 29. Validando regras funcionais de assets.project_file (DO block)...
+2026-11-24T15:32:00.2640711Z DO
+2026-11-24T15:32:00.2705351Z [validate] 30. Validando que a validacao nao deixou dados residuais em assets (DB-011)...
+2026-11-24T15:32:00.3636173Z [validate] 31. Validando tabelas e registro da migration de RBAC (DB-006)...
+2026-11-24T15:32:00.5537959Z [validate] 32. Validando check, unique e foreign keys das tabelas de RBAC (DB-006)...
+2026-11-24T15:32:00.8336370Z [validate] 33. Validando indices das tabelas de RBAC (DB-006)...
+2026-11-24T15:32:00.9303449Z [validate] 34. Validando regras funcionais, prevencao de duplicidade, suporte a escopo e acumulo de papeis em RBAC (DO block)...
+2026-11-24T15:32:01.0362800Z DO
+2026-11-24T15:32:01.0411782Z [validate] 35. Validando presenca e cobertura de seeds deterministicos em RBAC (DB-006)...
+2026-11-24T15:32:01.4996612Z [validate] 36. Validando presenca e integridade de seeds deterministicos em projetos (DB-008 e DB-016)...
+2026-11-24T15:32:01.9636069Z [validate] 37. Validando conformidade Anti-PII e determinismo nas tabelas de projeto...
+2026-11-24T15:32:02.2414696Z [validate] 38. Validando tabelas e registro da migration de rubricas e avaliacoes de PI (DB-010)...
+2026-11-24T15:32:02.6361693Z [validate] 39. Validando check, unique, foreign keys e precisao em aberto de rubricas e avaliacoes (DB-010)...
+2026-11-24T15:32:03.0137372Z [validate] 40. Validando indices das tabelas de rubricas e avaliacoes (DB-010)...
+2026-11-24T15:32:03.1106719Z [validate] 41. Validando regras funcionais de rubricas, avaliacoes e substituicao de nota sem historico (DO block)...
+2026-11-24T15:32:03.2228458Z DO
+2026-11-24T15:32:03.2282886Z [validate] 42. Validando que a validacao nao deixou dados residuais nas tabelas de rubricas e avaliacoes (DB-010)...
+2026-11-24T15:32:03.3237018Z [validate] Todas as validacoes de compatibilidade, integridade, constraints e seeds concluidas com sucesso!
+﻿2026-11-24T15:32:03.3271572Z ##[group]Run make validate-upgrade
+2026-11-24T15:32:03.3271843Z ^[[36;1mmake validate-upgrade^[[0m
+2026-11-24T15:32:03.3300416Z shell: /usr/bin/bash -e {0}
+2026-11-24T15:32:03.3300634Z ##[endgroup]
+2026-11-24T15:32:03.3356145Z ./scripts/validate_upgrade.sh
+2026-11-24T15:32:03.3384015Z === [validate_upgrade] Iniciando validacao de upgrade incremental ===
+2026-11-24T15:32:03.3384652Z 1. Provisionando banco isolado para upgrade: plataforma_upgrade_test...
+2026-11-24T15:32:03.4292585Z NOTICE:  database "plataforma_upgrade_test" does not exist, skipping
+2026-11-24T15:32:03.4293130Z DROP DATABASE
+2026-11-24T15:32:03.5522094Z CREATE DATABASE
+2026-11-24T15:32:03.5568222Z 2. Aplicando migration baseline (V0001)...
+2026-11-24T15:32:03.6539720Z BEGIN
+2026-11-24T15:32:03.6542269Z CREATE SCHEMA
+2026-11-24T15:32:03.6543299Z CREATE SCHEMA
+2026-11-24T15:32:03.6544781Z CREATE SCHEMA
+2026-11-24T15:32:03.6546012Z CREATE SCHEMA
+2026-11-24T15:32:03.6547185Z CREATE SCHEMA
+2026-11-24T15:32:03.6605509Z CREATE TABLE
+2026-11-24T15:32:03.6610793Z INSERT 0 1
+2026-11-24T15:32:03.6612990Z COMMIT
+2026-11-24T15:32:03.6663621Z 3. Validando estado pos-V0001...
+2026-11-24T15:32:03.7575681Z 4. Executando upgrade com migrate.sh...
+2026-11-24T15:32:03.9553091Z Migration V0001 ja aplicada em plataforma_upgrade_test, ignorando.
+2026-11-24T15:32:04.1510773Z Aplicando migration migrations/V0002__create_audit_event.sql em plataforma_upgrade_test...
+2026-11-24T15:32:04.2497746Z BEGIN
+2026-11-24T15:32:04.2579816Z CREATE TABLE
+2026-11-24T15:32:04.2596314Z CREATE INDEX
+2026-11-24T15:32:04.2610457Z CREATE INDEX
+2026-11-24T15:32:04.2620374Z CREATE INDEX
+2026-11-24T15:32:04.2625398Z INSERT 0 1
+2026-11-24T15:32:04.2628374Z COMMIT
+2026-11-24T15:32:04.4632674Z Aplicando migration migrations/V0003__create_identity_user_and_academic_link.sql em plataforma_upgrade_test...
+2026-11-24T15:32:04.5494242Z BEGIN
+2026-11-24T15:32:04.5694351Z CREATE TABLE
+2026-11-24T15:32:04.5704475Z CREATE INDEX
+2026-11-24T15:32:04.5714396Z CREATE INDEX
+2026-11-24T15:32:04.5725912Z CREATE INDEX
+2026-11-24T15:32:04.5784087Z CREATE TABLE
+2026-11-24T15:32:04.5794770Z CREATE INDEX
+2026-11-24T15:32:04.5806283Z CREATE INDEX
+2026-11-24T15:32:04.5839194Z CREATE TABLE
+2026-11-24T15:32:04.5848546Z CREATE INDEX
+2026-11-24T15:32:04.5863465Z CREATE INDEX
+2026-11-24T15:32:04.5873715Z CREATE INDEX
+2026-11-24T15:32:04.5922401Z CREATE TABLE
+2026-11-24T15:32:04.5933057Z CREATE INDEX
+2026-11-24T15:32:04.5943913Z CREATE INDEX
+2026-11-24T15:32:04.5953922Z CREATE INDEX
+2026-11-24T15:32:04.5958748Z INSERT 0 1
+2026-11-24T15:32:04.5961865Z COMMIT
+2026-11-24T15:32:04.7919926Z Aplicando migration migrations/V0004__create_user_session.sql em plataforma_upgrade_test...
+2026-11-24T15:32:04.8780862Z BEGIN
+2026-11-24T15:32:04.8905846Z CREATE TABLE
+2026-11-24T15:32:04.8915975Z CREATE INDEX
+2026-11-24T15:32:04.8925491Z CREATE INDEX
+2026-11-24T15:32:04.8940953Z CREATE INDEX
+2026-11-24T15:32:04.8945480Z INSERT 0 1
+2026-11-24T15:32:04.8954028Z COMMIT
+2026-11-24T15:32:05.0896091Z Aplicando migration migrations/V0006__create_rbac_schema.sql em plataforma_upgrade_test...
+2026-11-24T15:32:05.1757648Z BEGIN
+2026-11-24T15:32:05.1839020Z CREATE TABLE
+2026-11-24T15:32:05.1987928Z CREATE TABLE
+2026-11-24T15:32:05.2019830Z CREATE TABLE
+2026-11-24T15:32:05.2100818Z CREATE TABLE
+2026-11-24T15:32:05.2124403Z DO
+2026-11-24T15:32:05.2145301Z DO
+2026-11-24T15:32:05.2157711Z CREATE INDEX
+2026-11-24T15:32:05.2169392Z CREATE INDEX
+2026-11-24T15:32:05.2179081Z CREATE INDEX
+2026-11-24T15:32:05.2287534Z CREATE INDEX
+2026-11-24T15:32:05.2291610Z INSERT 0 1
+2026-11-24T15:32:05.2294707Z COMMIT
+2026-11-24T15:32:05.4276599Z Aplicando migration migrations/V0007__restrict_audit_event_to_technical_records.sql em plataforma_upgrade_test...
+2026-11-24T15:32:05.5155119Z BEGIN
+2026-11-24T15:32:05.5172514Z UPDATE 0
+2026-11-24T15:32:05.5175013Z ALTER TABLE
+2026-11-24T15:32:05.5175484Z NOTICE:  constraint "audit_event_no_snapshot_ck" of relation "audit_event" does not exist, skipping
+2026-11-24T15:32:05.5185371Z ALTER TABLE
+2026-11-24T15:32:05.5189102Z COMMENT
+2026-11-24T15:32:05.5190366Z COMMENT
+2026-11-24T15:32:05.5191489Z COMMENT
+2026-11-24T15:32:05.5197145Z INSERT 0 1
+2026-11-24T15:32:05.5200489Z COMMIT
+2026-11-24T15:32:05.7205898Z Aplicando migration migrations/V0008__create_project_tables.sql em plataforma_upgrade_test...
+2026-11-24T15:32:05.8042872Z BEGIN
+2026-11-24T15:32:05.8143700Z CREATE TABLE
+2026-11-24T15:32:05.8175398Z CREATE TABLE
+2026-11-24T15:32:05.8273640Z CREATE INDEX
+2026-11-24T15:32:05.8306106Z CREATE TABLE
+2026-11-24T15:32:05.8356220Z CREATE INDEX
+2026-11-24T15:32:05.8414038Z CREATE TABLE
+2026-11-24T15:32:05.8423720Z CREATE INDEX
+2026-11-24T15:32:05.8435360Z CREATE INDEX
+2026-11-24T15:32:05.8445469Z CREATE INDEX
+2026-11-24T15:32:05.8472249Z DO
+2026-11-24T15:32:05.8504959Z DO
+2026-11-24T15:32:05.8508531Z INSERT 0 1
+2026-11-24T15:32:05.8512568Z COMMIT
+2026-11-24T15:32:06.0475337Z Aplicando migration migrations/V0010__create_pi_rubric_and_evaluation.sql em plataforma_upgrade_test...
+2026-11-24T15:32:06.1305314Z BEGIN
+2026-11-24T15:32:06.1432075Z CREATE TABLE
+2026-11-24T15:32:06.1442258Z CREATE INDEX
+2026-11-24T15:32:06.1576155Z CREATE INDEX
+2026-11-24T15:32:06.1579147Z COMMENT
+2026-11-24T15:32:06.1580476Z COMMENT
+2026-11-24T15:32:06.1694812Z CREATE TABLE
+2026-11-24T15:32:06.1706020Z CREATE INDEX
+2026-11-24T15:32:06.1717035Z CREATE INDEX
+2026-11-24T15:32:06.1727450Z CREATE INDEX
+2026-11-24T15:32:06.1739233Z CREATE INDEX
+2026-11-24T15:32:06.1740392Z COMMENT
+2026-11-24T15:32:06.1803751Z CREATE TABLE
+2026-11-24T15:32:06.1814606Z CREATE INDEX
+2026-11-24T15:32:06.1824695Z CREATE INDEX
+2026-11-24T15:32:06.1835283Z CREATE INDEX
+2026-11-24T15:32:06.1836272Z COMMENT
+2026-11-24T15:32:06.1838209Z COMMENT
+2026-11-24T15:32:06.1843672Z INSERT 0 1
+2026-11-24T15:32:06.1847241Z COMMIT
+2026-11-24T15:32:06.3807070Z Aplicando migration migrations/V0011__create_project_file_metadata.sql em plataforma_upgrade_test...
+2026-11-24T15:32:06.4639786Z BEGIN
+2026-11-24T15:32:06.4781378Z CREATE TABLE
+2026-11-24T15:32:06.4785041Z COMMENT
+2026-11-24T15:32:06.4888693Z CREATE TABLE
+2026-11-24T15:32:06.4899875Z CREATE INDEX
+2026-11-24T15:32:06.4911643Z CREATE INDEX
+2026-11-24T15:32:06.4922022Z CREATE INDEX
+2026-11-24T15:32:06.4932523Z CREATE INDEX
+2026-11-24T15:32:06.4943615Z CREATE INDEX
+2026-11-24T15:32:06.4944587Z COMMENT
+2026-11-24T15:32:06.4945721Z COMMENT
+2026-11-24T15:32:06.4950319Z INSERT 0 1
+2026-11-24T15:32:06.4957640Z COMMIT
+2026-11-24T15:32:06.6905789Z Aplicando migration migrations/V0017__add_public_project_title_index.sql em plataforma_upgrade_test...
+2026-11-24T15:32:06.7737630Z BEGIN
+2026-11-24T15:32:06.7881548Z CREATE INDEX
+2026-11-24T15:32:06.7885569Z INSERT 0 1
+2026-11-24T15:32:06.7891650Z COMMIT
+2026-11-24T15:32:06.7935724Z 5. Verificando que todas as migrations da branch foram aplicadas no upgrade...
+2026-11-24T15:32:06.9102531Z    Migrations esperadas: V0001,V0002,V0003,V0004,V0006,V0007,V0008,V0010,V0011,V0017
+2026-11-24T15:32:06.9103458Z    Migrations aplicadas: V0001,V0002,V0003,V0004,V0006,V0007,V0008,V0010,V0011,V0017
+2026-11-24T15:32:06.9136895Z 6. Testando idempotencia de migrations (reexecutando migrate.sh no banco atualizado)...
+2026-11-24T15:32:07.1007599Z Migration V0001 ja aplicada em plataforma_upgrade_test, ignorando.
+2026-11-24T15:32:07.2905970Z Migration V0002 ja aplicada em plataforma_upgrade_test, ignorando.
+2026-11-24T15:32:07.4807950Z Migration V0003 ja aplicada em plataforma_upgrade_test, ignorando.
+2026-11-24T15:32:07.6738831Z Migration V0004 ja aplicada em plataforma_upgrade_test, ignorando.
+2026-11-24T15:32:07.8694076Z Migration V0006 ja aplicada em plataforma_upgrade_test, ignorando.
+2026-11-24T15:32:08.0586915Z Migration V0007 ja aplicada em plataforma_upgrade_test, ignorando.
+2026-11-24T15:32:08.2507600Z Migration V0008 ja aplicada em plataforma_upgrade_test, ignorando.
+2026-11-24T15:32:08.4450442Z Migration V0010 ja aplicada em plataforma_upgrade_test, ignorando.
+2026-11-24T15:32:08.6321095Z Migration V0011 ja aplicada em plataforma_upgrade_test, ignorando.
+2026-11-24T15:32:08.8240046Z Migration V0017 ja aplicada em plataforma_upgrade_test, ignorando.
+2026-11-24T15:32:08.9147480Z 7. Aplicando seeds deterministicos no banco atualizado...
+2026-11-24T15:32:08.9175566Z [seed] Aplicando seeds deterministicos em plataforma_upgrade_test...
+2026-11-24T15:32:08.9176208Z [seed] Aplicando seeds/0001_audit_event.sql em plataforma_upgrade_test...
+2026-11-24T15:32:09.0113068Z INSERT 0 15
+2026-11-24T15:32:09.0165334Z [seed] Aplicando seeds/0002_identity_user_link.sql em plataforma_upgrade_test...
+2026-11-24T15:32:09.1047411Z INSERT 0 5
+2026-11-24T15:32:09.1065484Z INSERT 0 2
+2026-11-24T15:32:09.1076899Z INSERT 0 2
+2026-11-24T15:32:09.1096887Z INSERT 0 5
+2026-11-24T15:32:09.1155535Z [seed] Aplicando seeds/0003_user_session.sql em plataforma_upgrade_test...
+2026-11-24T15:32:09.2049304Z INSERT 0 1
+2026-11-24T15:32:09.2060664Z INSERT 0 4
+2026-11-24T15:32:09.2106383Z [seed] Aplicando seeds/0004_rbac_roles_and_scopes.sql em plataforma_upgrade_test...
+2026-11-24T15:32:09.2951661Z BEGIN
+2026-11-24T15:32:09.2969709Z INSERT 0 3
+2026-11-24T15:32:09.2978686Z INSERT 0 7
+2026-11-24T15:32:09.3016140Z INSERT 0 2
+2026-11-24T15:32:09.3023006Z INSERT 0 4
+2026-11-24T15:32:09.3026304Z INSERT 0 1
+2026-11-24T15:32:09.3049458Z INSERT 0 1
+2026-11-24T15:32:09.3053756Z INSERT 0 1
+2026-11-24T15:32:09.3058712Z INSERT 0 1
+2026-11-24T15:32:09.3063181Z INSERT 0 1
+2026-11-24T15:32:09.3067348Z INSERT 0 1
+2026-11-24T15:32:09.3072049Z INSERT 0 1
+2026-11-24T15:32:09.3075415Z INSERT 0 1
+2026-11-24T15:32:09.3079293Z COMMIT
+2026-11-24T15:32:09.3131656Z [seed] Aplicando seeds/0005_project_tables.sql em plataforma_upgrade_test...
+2026-11-24T15:32:09.3991991Z BEGIN
+2026-11-24T15:32:09.4012408Z INSERT 0 4
+2026-11-24T15:32:09.4028298Z INSERT 0 3
+2026-11-24T15:32:09.4047764Z INSERT 0 3
+2026-11-24T15:32:09.4066172Z INSERT 0 5
+2026-11-24T15:32:09.4069035Z COMMIT
+2026-11-24T15:32:09.4119542Z [seed] 5 arquivo(s) de seed aplicado(s) com sucesso em plataforma_upgrade_test.
+2026-11-24T15:32:09.4120845Z 8. Testando idempotencia de seeds (reexecutando seed.sh no banco atualizado)...
+2026-11-24T15:32:09.4150530Z [seed] Aplicando seeds deterministicos em plataforma_upgrade_test...
+2026-11-24T15:32:09.4151196Z [seed] Aplicando seeds/0001_audit_event.sql em plataforma_upgrade_test...
+2026-11-24T15:32:09.5025195Z INSERT 0 0
+2026-11-24T15:32:09.5071664Z [seed] Aplicando seeds/0002_identity_user_link.sql em plataforma_upgrade_test...
+2026-11-24T15:32:09.5937486Z INSERT 0 0
+2026-11-24T15:32:09.5944332Z INSERT 0 0
+2026-11-24T15:32:09.5952377Z INSERT 0 0
+2026-11-24T15:32:09.5961398Z INSERT 0 0
+2026-11-24T15:32:09.6011824Z [seed] Aplicando seeds/0003_user_session.sql em plataforma_upgrade_test...
+2026-11-24T15:32:09.6873395Z INSERT 0 0
+2026-11-24T15:32:09.6876704Z INSERT 0 0
+2026-11-24T15:32:09.6927377Z [seed] Aplicando seeds/0004_rbac_roles_and_scopes.sql em plataforma_upgrade_test...
+2026-11-24T15:32:09.7910363Z BEGIN
+2026-11-24T15:32:09.7926682Z INSERT 0 0
+2026-11-24T15:32:09.7934103Z INSERT 0 0
+2026-11-24T15:32:09.7963910Z INSERT 0 0
+2026-11-24T15:32:09.7966608Z INSERT 0 0
+2026-11-24T15:32:09.7969408Z INSERT 0 0
+2026-11-24T15:32:09.7980128Z INSERT 0 0
+2026-11-24T15:32:09.7982681Z INSERT 0 0
+2026-11-24T15:32:09.7985526Z INSERT 0 0
+2026-11-24T15:32:09.7988335Z INSERT 0 0
+2026-11-24T15:32:09.7990501Z INSERT 0 0
+2026-11-24T15:32:09.7993609Z INSERT 0 0
+2026-11-24T15:32:09.7996421Z INSERT 0 0
+2026-11-24T15:32:09.8002698Z COMMIT
+2026-11-24T15:32:09.8050694Z [seed] Aplicando seeds/0005_project_tables.sql em plataforma_upgrade_test...
+2026-11-24T15:32:09.8911342Z BEGIN
+2026-11-24T15:32:09.8930998Z INSERT 0 0
+2026-11-24T15:32:09.8941907Z INSERT 0 0
+2026-11-24T15:32:09.8942448Z INSERT 0 0
+2026-11-24T15:32:09.8952128Z INSERT 0 0
+2026-11-24T15:32:09.8952861Z COMMIT
+2026-11-24T15:32:09.9017965Z [seed] 5 arquivo(s) de seed aplicado(s) com sucesso em plataforma_upgrade_test.
+2026-11-24T15:32:09.9019214Z 9. Executando suite completa de validacao no banco atualizado...
+2026-11-24T15:32:09.9050116Z [validate] 1. Validando schemas de dominio em plataforma_upgrade_test...
+2026-11-24T15:32:10.0000636Z [validate] 2. Validando tabela public.schema_migration...
+2026-11-24T15:32:10.0958687Z [validate] 3. Validando registro de todas as migrations aplicadas...
+2026-11-24T15:32:10.2124712Z    Todas as migrations da branch registradas com sucesso em plataforma_upgrade_test: V0001,V0002,V0003,V0004,V0006,V0007,V0008,V0010,V0011,V0017
+2026-11-24T15:32:10.2125777Z [validate] 4. Validando tabela public.audit_event...
+2026-11-24T15:32:10.3079373Z [validate] 5. Validando indices da tabela public.audit_event...
+2026-11-24T15:32:10.4054913Z [validate] 6. Validando check constraints da tabela public.audit_event...
+2026-11-24T15:32:10.5017328Z [validate] 7. Validando postura de seguranca (sem USAGE/CREATE para PUBLIC)...
+2026-11-24T15:32:10.5971349Z [validate] 8. Validando integridade e funcionamento de constraints em public.audit_event...
+2026-11-24T15:32:10.6835331Z DO
+2026-11-24T15:32:10.6880958Z [validate] 9. Validando presenca e cobertura de seeds deterministicos em public.audit_event...
+2026-11-24T15:32:10.9699846Z [validate] 9.1. Validando que audit_event nao persiste snapshots de valores (DB-007)...
+2026-11-24T15:32:11.2484055Z [validate] 9.2. Validando que nenhuma rotina ou trigger alimenta audit_event (DB-007)...
+2026-11-24T15:32:11.4361830Z [validate] 9.3. Validando comportamento de audit_event sem snapshots (DB-007)...
+2026-11-24T15:32:11.5242582Z DO
+2026-11-24T15:32:11.5300547Z [validate] 10. Validando tabelas de identidade, usuario e vinculo (DB-004)...
+2026-11-24T15:32:11.6265314Z [validate] 11. Validando check constraints de identidade, usuario e vinculo...
+2026-11-24T15:32:11.7201999Z [validate] 12. Validando foreign keys de identidade e vinculo...
+2026-11-24T15:32:11.8205499Z [validate] 13. Validando unique constraints de identidade, usuario e vinculo...
+2026-11-24T15:32:11.9136042Z [validate] 14. Validando indices de identidade, usuario e vinculo...
+2026-11-24T15:32:12.0117340Z [validate] 15. Validando comportamento funcional e regras de integridade (DO block)...
+2026-11-24T15:32:12.1161935Z DO
+2026-11-24T15:32:12.1199988Z [validate] 16. Validando presenca de dados sinteticos nas tabelas DB-004...
+2026-11-24T15:32:12.4929223Z [validate] 17. Validando conformidade Anti-PII e determinismo (sem dados pessoais)...
+2026-11-24T15:32:12.8700894Z [validate] 18. Validando tabela auth.user_session (DB-005)...
+2026-11-24T15:32:12.9636454Z [validate] 19. Validando constraints e foreign keys de auth.user_session...
+2026-11-24T15:32:13.2478830Z [validate] 20. Validando indices de auth.user_session...
+2026-11-24T15:32:13.3493402Z [validate] 21. Validando regras funcionais e de integridade em auth.user_session (DO block)...
+2026-11-24T15:32:13.4496246Z DO
+2026-11-24T15:32:13.4547589Z [validate] 22. Validando presenca de dados sinteticos em auth.user_session...
+2026-11-24T15:32:13.6415078Z [validate] 23. Validando tabelas e registro da migration de projetos (DB-008)...
+2026-11-24T15:32:13.8401185Z [validate] 24. Validando check, unique e foreign keys das tabelas de projeto...
+2026-11-24T15:32:14.1185282Z [validate] 25. Validando indices das tabelas de projeto...
+2026-11-24T15:32:14.2171102Z [validate] 26. Validando regras funcionais e de integridade das tabelas de projeto (DO block)...
+2026-11-24T15:32:14.3240186Z DO
+2026-11-24T15:32:14.3288162Z [validate] 27. Validando tabelas de metadados de arquivos (DB-011)...
+2026-11-24T15:32:14.5284117Z [validate] 28. Validando que o binario nao e armazenado em assets.project_file (DB-011)...
+2026-11-24T15:32:14.6318729Z [validate] 29. Validando regras funcionais de assets.project_file (DO block)...
+2026-11-24T15:32:14.7387948Z DO
+2026-11-24T15:32:14.7436373Z [validate] 30. Validando que a validacao nao deixou dados residuais em assets (DB-011)...
+2026-11-24T15:32:14.8355839Z [validate] 31. Validando tabelas e registro da migration de RBAC (DB-006)...
+2026-11-24T15:32:15.0264222Z [validate] 32. Validando check, unique e foreign keys das tabelas de RBAC (DB-006)...
+2026-11-24T15:32:15.3085301Z [validate] 33. Validando indices das tabelas de RBAC (DB-006)...
+2026-11-24T15:32:15.4079404Z [validate] 34. Validando regras funcionais, prevencao de duplicidade, suporte a escopo e acumulo de papeis em RBAC (DO block)...
+2026-11-24T15:32:15.5130056Z DO
+2026-11-24T15:32:15.5181992Z [validate] 35. Validando presenca e cobertura de seeds deterministicos em RBAC (DB-006)...
+2026-11-24T15:32:15.9822792Z [validate] 36. Validando presenca e integridade de seeds deterministicos em projetos (DB-008 e DB-016)...
+2026-11-24T15:32:16.4411875Z [validate] 37. Validando conformidade Anti-PII e determinismo nas tabelas de projeto...
+2026-11-24T15:32:16.7203614Z [validate] 38. Validando tabelas e registro da migration de rubricas e avaliacoes de PI (DB-010)...
+2026-11-24T15:32:17.1156892Z [validate] 39. Validando check, unique, foreign keys e precisao em aberto de rubricas e avaliacoes (DB-010)...
+2026-11-24T15:32:17.4976130Z [validate] 40. Validando indices das tabelas de rubricas e avaliacoes (DB-010)...
+2026-11-24T15:32:17.5995421Z [validate] 41. Validando regras funcionais de rubricas, avaliacoes e substituicao de nota sem historico (DO block)...
+2026-11-24T15:32:17.7116944Z DO
+2026-11-24T15:32:17.7165475Z [validate] 42. Validando que a validacao nao deixou dados residuais nas tabelas de rubricas e avaliacoes (DB-010)...
+2026-11-24T15:32:17.8115231Z [validate] Todas as validacoes de compatibilidade, integridade, constraints e seeds concluidas com sucesso!
+2026-11-24T15:32:17.8116266Z 10. Detectando drift estrutural entre instalacao limpa (plataforma) e upgrade (plataforma_upgrade_test)...
+2026-11-24T15:32:17.8145783Z === [detect_drift] Iniciando deteccao de drift estrutural de schemas ===
+2026-11-24T15:32:17.8146312Z    Banco de instalacao limpa (referencia): plataforma
+2026-11-24T15:32:17.8146787Z    Banco de upgrade incremental:          plataforma_upgrade_test
+2026-11-24T15:32:18.0094618Z 1. Extraindo DDL normalizado da instalacao limpa (plataforma)...
+2026-11-24T15:32:18.1804080Z 2. Extraindo DDL normalizado do banco atualizado (plataforma_upgrade_test)...
+2026-11-24T15:32:18.3563541Z 3. Comparando contagem de objetos estruturais via catalogo...
+2026-11-24T15:32:18.5557721Z    Clean install: schemas=5,tables=20,constraints=119,indexes=79
+2026-11-24T15:32:18.5558500Z    Upgrade:       schemas=5,tables=20,constraints=119,indexes=79
+2026-11-24T15:32:18.5558970Z 4. Executando diff estrutural entre schemas DDL...
+2026-11-24T15:32:18.5575963Z === [detect_drift] SUCESSO: Nenhum drift detectado! Schemas de instalacao limpa e upgrade sao equivalentes. ===
+2026-11-24T15:32:18.5585363Z 11. Limpando banco temporario de upgrade...
+2026-11-24T15:32:18.7843611Z DROP DATABASE
+2026-11-24T15:32:18.7895876Z === [validate_upgrade] Validacao de upgrade, compatibilidade, idempotencia e ausencia de drift concluida com sucesso! ===
+﻿2026-11-24T15:32:18.7934254Z ##[group]Run make down
+2026-11-24T15:32:18.7934486Z ^[[36;1mmake down^[[0m
+2026-11-24T15:32:18.7962783Z shell: /usr/bin/bash -e {0}
+2026-11-24T15:32:18.7963003Z ##[endgroup]
+2026-11-24T15:32:18.8018633Z docker compose down
+2026-11-24T15:32:18.8533564Z  Container plataforma-database-postgres-1 Stopping 
+2026-11-24T15:32:18.9751370Z  Container plataforma-database-postgres-1 Stopped 
+2026-11-24T15:32:18.9752000Z  Container plataforma-database-postgres-1 Removing 
+2026-11-24T15:32:18.9818519Z  Container plataforma-database-postgres-1 Removed 
+2026-11-24T15:32:18.9823849Z  Network plataforma-database_default Removing 
+2026-11-24T15:32:19.0239642Z  Network plataforma-database_default Removed 
