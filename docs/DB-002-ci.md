@@ -22,8 +22,8 @@ Os objetivos centrais incluem:
 A pipeline é implementada através do GitHub Actions no arquivo [ci.yml](file:///.github/workflows/ci.yml).
 
 ### Disparadores (Triggers)
-- **Push:** Todos os commits em qualquer branch e merges na branch `main`.
-- **Pull Request:** Validação obrigatória para PRs com destino à branch `main`.
+- **Push:** Todos os commits em qualquer branch (`'**'`) e na branch `main`.
+- **Pull Request:** Validação automática para PRs com destino à branch `main`.
 - **Workflow Dispatch:** Execução manual sob demanda.
 
 ### Etapas da Execução
@@ -65,44 +65,37 @@ O script [validate_upgrade.sh](file:///scripts/validate_upgrade.sh) automatiza o
 1. Cria dinamicamente um banco isolado temporário (`plataforma_upgrade_test`).
 2. Aplica apenas a migration baseline inicial (`V0001__create_domain_schemas.sql`).
 3. Valida que o estado intermediário reflete exclusivamente a versão baseline.
-4. Executa o `migrate.sh` padrão sobre o banco temporário, confirmando que o sistema reconhece a versão anterior e aplica apenas as migrações mais recentes (`V0002__create_audit_event.sql`).
-5. Valida a idempotência executando o `migrate.sh` uma segunda vez, confirmando que não ocorrem erros nem duplicações.
-6. Aplica os seeds determinísticos (`seed.sh`).
-7. Executa a suíte de validação completa (`validate.sh`).
-8. Remove com segurança o banco temporário de teste.
+4. Executa o `migrate.sh` padrão sobre o banco temporário, confirmando que a versão `V0001` é ignorada e todas as migrations subsequentes da branch (`migrations/*.sql`) são aplicadas e registradas em `public.schema_migration` (com verificação explícita de `V0006`, `V0008` e `V0010`).
+5. Valida a idempotência executando o `migrate.sh` uma segunda vez, confirmando que não ocorrem erros nem alterações na lista de versões.
+6. Aplica os seeds determinísticos (`seed.sh`) duas vezes para validar idempotência de sementes.
+7. Executa a suíte de validação completa (`validate.sh`) sobre o banco atualizado.
+8. Executa `scripts/detect_drift.sh` comparando o schema normalizado e as contagens de catálogo entre a instalação limpa e o banco atualizado.
+9. Remove com segurança o banco temporário de teste.
 
 ---
 
 ## 5. Verificações de Integridade e Postura de Segurança (`validate.sh`)
 
-O script [validate.sh](file:///scripts/validate.sh) realiza 8 etapas de validação rigorosa:
-1. **Schemas de domínio:** Confirma a existência de `auth`, `academic_pi`, `extension`, `assets` e `institutional`.
-2. **Tabela de versionamento:** Confirma a criação de `public.schema_migration`.
-3. **Histórico de migrações:** Confirma o registro das versões `V0001` e `V0002`.
-4. **Tabela de auditoria:** Confirma a existência de `public.audit_event`.
-5. **Índices de desempenho:** Confirma a presença de:
-   - `idx_audit_event_actor`
-   - `idx_audit_event_occurred_at`
-   - `idx_audit_event_record`
-6. **Check Constraints:** Confirma as restrições:
-   - `audit_event_operation_ck` (INSERT, UPDATE, DELETE)
-   - `audit_event_schema_name_ck` (não vazio)
-   - `audit_event_table_name_ck` (não vazio)
-7. **Postura de segurança (ADR-011):** Garante que o role `PUBLIC` possui zero privilégios de `USAGE` ou `CREATE` nos schemas de domínio.
-8. **Validação funcional de constraints:** Testa a rejeição ativa de operações inválidas por violação de constraint via bloco `DO $$ ... $$`.
+> [!NOTE]
+> Na entrega inicial da DB-002, `validate.sh` possuía 8 etapas focadas em `V0001` e `V0002`. Conforme as entregas subsequentes, o script evoluiu e atualmente executa **42 blocos de verificação** (`[validate] 1` a `42`), detalhados no [Runbook Operacional (DB-020)](DB-020-runbook.md).
+
+Resumo das verificações atuais em [validate.sh](file:///scripts/validate.sh):
+1. **Schemas, controle e segurança base (passos 1–9.3):** existência dos 5 schemas de domínio, `public.schema_migration` com todas as migrations da branch, `public.audit_event`, índices, check constraints, restrição de `old_data`/`new_data` (`DB-007`), ausência de privilégios para `PUBLIC` e cobertura de seeds em `audit_event`.
+2. **Identidade, vínculo e sessões (passos 10–22):** `auth.user`, `auth.user_identity`, `institutional.academic_class`, `institutional.academic_link` (`DB-004`), `auth.user_session` (`DB-005`), constraints, índices, seeds e conformidade Anti-PII.
+3. **Projetos, artefatos, RBAC e avaliações (passos 23–42):** `academic_pi.*` (`DB-008`, `DB-016`), `assets.project_file` e `assets.file_lifecycle_state` (`DB-011`), `roles`/`permissions`/`role_permissions`/`user_roles` (`DB-006`) e `evaluation_criterion`/`project_evaluation`/`evaluation_criterion_score` (`DB-010`).
 
 ---
 
 ## 6. Estratégia de Rollback e Segurança Operacional
 
-Conforme definido na DB-001 e alinhado à governança da plataforma:
-1. **Imutabilidade:** Arquivos de migrations já mesclados na branch `main` são imutáveis e jamais devem ser editados.
-2. **Roll-forward por padrão:** Qualquer correção ou ajuste em schema em ambientes integrados e produção deve ser realizado através de uma nova migração sequencial incremental (ex.: `V0003__...`).
+Conforme definido na DB-001 e alinhado ao [Runbook Operacional (DB-020)](DB-020-runbook.md):
+1. **Imutabilidade:** Arquivos de migrations já publicados em branches compartilhadas são imutáveis e jamais devem ser editados. Não existe script de rollback (`down` migration) no repositório.
+2. **Roll-forward por padrão:** Qualquer correção ou ajuste em schema em ambientes integrados e produção deve ser realizado através de uma nova migração sequencial incremental (ex.: `V0018__...`).
 3. **Padrão Expand and Contract:** Operações que alteram estruturas existentes sem downtime seguem as três etapas:
-   - *Expand:* Criação da nova estrutura coexistindo com a anterior.
+   - *Expand:* Criação da nova estrutura coexistindo com a anterior (ex.: `V0007`).
    - *Transition:* Adaptação do código da aplicação e backfill dos dados.
    - *Contract:* Remoção segura dos artefatos legados após descontinuação do uso.
-4. **Recuperação de Desastres (PITR):** Antes de qualquer intervenção estrutural de grande porte em produção, backups completos e estratégias de Point-in-Time Recovery (PITR) são obrigatórios para restauração em caso de anomalia catastrófica.
+4. **Recuperação de Desastres (PITR — pendente de DB-018):** A estratégia de backup e *Point-in-Time Recovery* (PITR) é prevista como norma de governança, porém **ainda não foi exercitada** neste repositório (aguarda execução e evidência da issue **DB-018**).
 
 ---
 
