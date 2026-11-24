@@ -1156,4 +1156,17 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NA
   "SELECT (SELECT count(*) FROM academic_pi.evaluation_criterion) || ',' || (SELECT count(*) FROM academic_pi.project_evaluation) || ',' || (SELECT count(*) FROM academic_pi.evaluation_criterion_score);" \
   | grep -qx '0,0,0'
 
+echo "[validate] 43. Validando conformidade da analise do catalogo publico (DB-014) sem campos ou indices pendentes..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'academic_pi' AND table_name = 'project' AND column_name IN ('course_code','course_id','ods','ods_codes','semester','academic_term','keywords','final_score');" \
+  | grep -qx '0'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(indexname, ',' ORDER BY indexname) FROM pg_indexes WHERE schemaname = 'academic_pi' AND tablename = 'project' AND indexname LIKE 'idx_%';" \
+  | grep -qx 'idx_project_public_title'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM pg_indexes WHERE schemaname = 'academic_pi' AND tablename IN ('evaluation_criterion', 'project_evaluation', 'evaluation_criterion_score') AND indexdef ~* 'is_public|published';" \
+  | grep -qx '0'
+
 echo "[validate] Todas as validacoes de compatibilidade, integridade, constraints e seeds concluidas com sucesso!"

@@ -77,12 +77,12 @@ O script [validate_upgrade.sh](file:///scripts/validate_upgrade.sh) automatiza o
 ## 5. Verificações de Integridade e Postura de Segurança (`validate.sh`)
 
 > [!NOTE]
-> Na entrega inicial da DB-002, `validate.sh` possuía 8 etapas focadas em `V0001` e `V0002`. Conforme as entregas subsequentes, o script evoluiu e atualmente executa **42 blocos de verificação** (`[validate] 1` a `42`), detalhados no [Runbook Operacional (DB-020)](DB-020-runbook.md).
+> Na entrega inicial da DB-002, `validate.sh` possuía 8 etapas focadas em `V0001` e `V0002`. Conforme as entregas subsequentes, o script evoluiu e atualmente executa **43 blocos de verificação** (`[validate] 1` a `43`), detalhados no [Runbook Operacional (DB-020)](DB-020-runbook.md).
 
 Resumo das verificações atuais em [validate.sh](file:///scripts/validate.sh):
 1. **Schemas, controle e segurança base (passos 1–9.3):** existência dos 5 schemas de domínio, `public.schema_migration` com todas as migrations da branch, `public.audit_event`, índices, check constraints, restrição de `old_data`/`new_data` (`DB-007`), ausência de privilégios para `PUBLIC` e cobertura de seeds em `audit_event`.
 2. **Identidade, vínculo e sessões (passos 10–22):** `auth.user`, `auth.user_identity`, `institutional.academic_class`, `institutional.academic_link` (`DB-004`), `auth.user_session` (`DB-005`), constraints, índices, seeds e conformidade Anti-PII.
-3. **Projetos, artefatos, RBAC e avaliações (passos 23–42):** `academic_pi.*` (`DB-008`, `DB-016`), `assets.project_file` e `assets.file_lifecycle_state` (`DB-011`), `roles`/`permissions`/`role_permissions`/`user_roles` (`DB-006`) e `evaluation_criterion`/`project_evaluation`/`evaluation_criterion_score` (`DB-010`).
+3. **Projetos, artefatos, RBAC, avaliações e catálogo (passos 23–43):** `academic_pi.*` (`DB-008`, `DB-016`), `assets.project_file` e `assets.file_lifecycle_state` (`DB-011`), `roles`/`permissions`/`role_permissions`/`user_roles` (`DB-006`), `evaluation_criterion`/`project_evaluation`/`evaluation_criterion_score` (`DB-010`) e guarda de campos/índices do catálogo público (`DB-014`).
 
 ---
 

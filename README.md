@@ -53,7 +53,7 @@ make test
 make down
 ```
 
-O comando `make validate` executa os 42 blocos de [`scripts/validate.sh`](scripts/validate.sh), verificando os 5 schemas de domínio, `public.schema_migration` com todas as migrations da branch, `public.audit_event` (sem snapshots, DB-007), postura de segurança (ausência de privilégios para `PUBLIC`), tabelas/constraints/índices/comportamento de identidade (`DB-004`), sessões (`DB-005`), projetos (`DB-008`), artefatos (`DB-011`), RBAC (`DB-006`), seeds (`DB-016`), rubricas/avaliações de PI (`DB-010`) e conformidade Anti-PII (LGPD).
+O comando `make validate` executa os 43 blocos de [`scripts/validate.sh`](scripts/validate.sh), verificando os 5 schemas de domínio, `public.schema_migration` com todas as migrations da branch, `public.audit_event` (sem snapshots, DB-007), postura de segurança (ausência de privilégios para `PUBLIC`), tabelas/constraints/índices/comportamento de identidade (`DB-004`), sessões (`DB-005`), projetos (`DB-008`), artefatos (`DB-011`), RBAC (`DB-006`), seeds (`DB-016`), rubricas/avaliações de PI (`DB-010`), não cristalização de filtros pendentes no catálogo (`DB-014`) e conformidade Anti-PII (LGPD).
 
 O comando `make validate-upgrade` valida a migração incremental a partir da baseline `V0001` para todas as migrations da branch, testa a idempotência de reaplicação de migrations e seeds e invoca `scripts/detect_drift.sh` para assegurar que instalação limpa e upgrade produzem schemas equivalentes. Consulte o [Runbook Operacional (DB-020)](docs/DB-020-runbook.md) para ver o que já foi exercitado na CI versus procedimentos ainda pendentes (`DB-018` e `DB-019`).
 
@@ -66,6 +66,7 @@ O comando `make validate-upgrade` valida a migração incremental a partir da ba
 - [DB-005: Sessões, Hashes, Expiração, Revogação e Rotação de Tokens](docs/DB-005-session-tokens.md)
 - [DB-006: Papéis, Permissões e Escopos de Autorização RBAC](docs/DB-006-roles-and-scopes.md)
 - [DB-010: Rubricas, Critérios e Avaliações de PI](docs/DB-010-pi-rubric-and-evaluation.md)
+- [DB-014: Análise de Campos do Catálogo Público e Critérios de Indexação](docs/DB-014-public-catalog-analysis.md)
 - [DB-016: Detecção de Drift Estrutural e Fixtures Determinísticas](docs/DB-016-drift-detection.md)
 - [DB-020: Dicionário de Dados do Schema Vigente](docs/DB-020-data-dictionary.md)
 - [DB-020: Runbook Operacional e Matriz de Procedimentos Exercitados](docs/DB-020-runbook.md)
@@ -77,6 +78,7 @@ O comando `make validate-upgrade` valida a migração incremental a partir da ba
 - [Evidência DB-005: Sessões e Tokens com Hash, Expiração, Revogação e Índices](evidence/DB-005-session-tokens.md)
 - [Evidência DB-006: Papéis, Permissões e Escopos com Prevenção de Duplicidade](evidence/DB-006-roles-and-scopes.md)
 - [Evidência DB-010: Rubricas e Notas de PI sem Cristalização de Regras Pendentes](evidence/DB-010-pi-rubric-and-evaluation.md)
+- [Evidência DB-014: Análise de Campos do Catálogo Público e Conformidade de Índices](evidence/DB-014-catalog-analysis.md)
 - [Evidência DB-016: Detecção de Drift entre Instalação e Upgrade com Fixtures Determinísticas](evidence/DB-016-drift-detection.md)
 - [Evidência DB-020: Execução Reproduzível do Runbook na CI (PostgreSQL 16)](evidence/DB-020-runbook-validation.md)
 
