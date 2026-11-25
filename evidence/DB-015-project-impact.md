@@ -14,8 +14,8 @@ Regras: `plataforma-governance/_KB/product/mvp-decisions-2026-11-21.md`, seção
 ## Execução
 | Verificação | Resultado |
 |---|---|
-| Instalação limpa: migrations V0001 a V0017, seeds 0001 a 0006, `validate.sh` passos 1 a 41 | Passou |
-| Idempotência do seed 0006 (executado duas vezes, com triggers de guarda ativos) | Passou |
+| Instalação limpa: migrations V0001 a V0017, seeds 0001 a 0015, `validate.sh` passos 1 a 55 | Passou |
+| Idempotência do seed 0015 (executado duas vezes, com triggers de guarda ativos) | Passou |
 | `validate_upgrade.sh`: upgrade V0001 até a última migration, idempotência de migrations e seeds, `validate.sh` no banco atualizado | Passou |
 | `detect_drift.sh` (dentro do upgrade): schemas de instalação limpa e de upgrade equivalentes | Passou ("Nenhum drift detectado") |
 | Teste de mutação: remover `project_impact_approved_ck` (aprovação exige campos obrigatórios) | `validate.sh` falhou, como esperado |

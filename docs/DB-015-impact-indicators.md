@@ -60,7 +60,7 @@ Fluxo de correção suportado: o impacto sai de `approved` (volta para `draft` o
 2. **`activity_hours` é total declarado do projeto.** O Backend usa o mesmo conceito (`activityHours`, mínimo 0,01) e o Caderno impede somar horas individuais.
 3. **Vários impactos por projeto são permitidos.** O Backend já consulta uma lista de impactos por projeto.
 4. **ODS em tabela própria**, não em array: unicidade garantida e filtro do catálogo por ODS.
-5. **Seed `0006`:** o impacto 1 entra como `draft` e é aprovado ao final porque os ODS só mudam fora de `approved`; os ODS usam `NOT EXISTS` (e não `ON CONFLICT`) porque o trigger roda antes da checagem de conflito.
+5. **Seed `0015`:** o impacto 1 entra como `draft` e é aprovado ao final porque os ODS só mudam fora de `approved`; os ODS usam `NOT EXISTS` (e não `ON CONFLICT`) porque o trigger roda antes da checagem de conflito.
 
 ## 6. Divergências com o Backend (a corrigir no Backend, não no banco)
 Conferido em `plataforma-backend`, branch `main` (22/11/2026):
@@ -84,4 +84,4 @@ Além do impacto, o Backend referencia outras tabelas que não existem neste rep
 - Confirmação do PO sobre o comportamento de correção da seção 4.
 
 ## 8. Verificação
-`scripts/validate.sh` passos 38 a 41: estrutura e triggers, ausência de histórico/versões, colunas da visão, regras funcionais (estados, aprovação incompleta, indicadores, período, FKs, ODS, guarda do conteúdo aprovado, correção com nova aprovação, retirada, projeto não público) e seeds (`seeds/0006_project_impact.sql`).
+`scripts/validate.sh` passos 52 a 55: estrutura e triggers, ausência de histórico/versões, colunas da visão, regras funcionais (estados, aprovação incompleta, indicadores, período, FKs, ODS, guarda do conteúdo aprovado, correção com nova aprovação, retirada, projeto não público) e seeds (`seeds/0015_project_impact.sql`).

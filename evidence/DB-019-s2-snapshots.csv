@@ -1,0 +1,12 @@
+sample,captured_at_utc,max_connections,superuser_reserved,reserved_connections,usable_regular_slots,client_backends,other_backends,active_conns,idle_conns,idle_in_tx_conns,idle_in_tx_aborted_conns,utilization_pct,waiting_sessions,wait_events,active_xacts,max_xact_ms,max_query_ms,max_idle_in_tx_ms,by_app_user,container_cpu_pct,container_mem_usage,container_mem_pct,container_pids,saturation_status
+1,2026-11-25T03:56:55.043Z,100,3,2,95,40,5,12,7,21,0,42.11,6,LWLock:WALWrite(5);IO:WALSync(1),33,8.91,2.97,1.34,db019_app_pool@hikari_sim_4replicas=40(act:12/idle:7),934.05%,137.7MiB / 7.731GiB,1.74%,50,WAIT_OR_IDLE_TX
+2,2026-11-25T03:56:59.399Z,100,3,2,95,40,5,35,0,5,0,42.11,29,LWLock:WALWrite(28);IO:WALSync(1),40,12.17,6.17,3.20,db019_app_pool@hikari_sim_4replicas=40(act:35/idle:0),886.95%,137.2MiB / 7.731GiB,1.73%,50,WAIT_OR_IDLE_TX
+3,2026-11-25T03:57:03.465Z,100,3,2,95,0,5,0,0,0,0,0.00,0,none,0,0,0,0,none,0.02%,57.91MiB / 7.731GiB,0.73%,6,OK
+4,2026-11-25T03:57:06.844Z,100,3,2,95,0,5,0,0,0,0,0.00,0,none,0,0,0,0,none,3.27%,58.27MiB / 7.731GiB,0.74%,6,OK
+5,2026-11-25T03:57:09.972Z,100,3,2,95,0,5,0,0,0,0,0.00,0,none,0,0,0,0,none,0.02%,57.89MiB / 7.731GiB,0.73%,6,OK
+6,2026-11-25T03:57:13.089Z,100,3,2,95,0,5,0,0,0,0,0.00,0,none,0,0,0,0,none,0.02%,58MiB / 7.731GiB,0.73%,6,OK
+7,2026-11-25T03:57:17.247Z,100,3,2,95,0,5,0,0,0,0,0.00,0,none,0,0,0,0,none,4.73%,58.27MiB / 7.731GiB,0.74%,6,OK
+8,2026-11-25T03:57:20.824Z,100,3,2,95,0,5,0,0,0,0,0.00,0,none,0,0,0,0,none,0.03%,58.44MiB / 7.731GiB,0.74%,6,OK
+9,2026-11-25T03:57:24.293Z,100,3,2,95,0,5,0,0,0,0,0.00,0,none,0,0,0,0,none,0.00%,57.86MiB / 7.731GiB,0.73%,6,OK
+10,2026-11-25T03:57:27.768Z,100,3,2,95,0,5,0,0,0,0,0.00,0,none,0,0,0,0,none,4.51%,58.3MiB / 7.731GiB,0.74%,6,OK
+11,2026-11-25T03:57:31.149Z,100,3,2,95,0,5,0,0,0,0,0.00,0,none,0,0,0,0,none,0.06%,57.98MiB / 7.731GiB,0.73%,6,OK

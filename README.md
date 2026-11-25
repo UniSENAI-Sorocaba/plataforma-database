@@ -13,7 +13,7 @@ Migrations e dados sintéticos para PostgreSQL 16. Este repositório é a única
 
 ## Integração Contínua (CI)
 
-A esteira de Integração Contínua é executada via GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) a cada *push* e *pull request* direcionado à branch `main`.
+A esteira de Integração Contínua é executada via GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) a cada *push* em qualquer branch (`main`, `develop`, feature branches), *pull request* direcionado à `main` ou disparo manual (`workflow_dispatch`).
 
 A pipeline executa:
 1. Subida de container limpo PostgreSQL 16 (`make up`);
@@ -46,16 +46,22 @@ make validate-upgrade
 # 6. Ou executa a detecção de drift diretamente entre dois bancos
 make detect-drift
 
-# 7. Ou executa todas as validações de uma vez
+# 7. Monitora conexões, esperas, transações e recursos do PostgreSQL sob carga (DB-019)
+make monitor-pool
+
+# 8. Executa suíte local controlada de concorrência de pool e guardrails de timeout (DB-019)
+make test-pool
+
+# 9. Ou executa todas as validações estruturais de uma vez
 make test
 
-# 8. Encerra e remove os containers locais
+# 10. Encerra e remove os containers locais
 make down
 ```
 
-O comando `make validate` verifica a existência dos schemas de domínio, a tabela de controle `public.schema_migration`, a tabela de auditoria `public.audit_event`, integridade de restrições (check constraints), índices, postura de segurança (ausência de privilégios públicos para a role `PUBLIC`), cobertura de seeds nos 5 schemas de domínio e conformidade Anti-PII (LGPD).
+O comando `make validate` executa os 46 blocos de [`scripts/validate.sh`](scripts/validate.sh), verificando os 5 schemas de domínio, `public.schema_migration` com todas as migrations da branch, `public.audit_event` (sem snapshots, DB-007), postura de segurança (ausência de privilégios para `PUBLIC`), identidade (`DB-004`), sessões (`DB-005`), projetos (`DB-008`), artefatos (`DB-011`), RBAC (`DB-006`), seeds (`DB-016`), avaliações individuais (`DB-009`), atividades/horas de extensão (`DB-013`), parâmetros de pool/timeouts (`DB-019`) e conformidade Anti-PII (LGPD).
 
-O comando `make validate-upgrade` valida a migração incremental a partir do estado anterior (baseline V0001) para a versão atual, cobre todas as migrations da branch, testa a idempotência de reaplicação das migrações e das sementes sintéticas, e invoca o `scripts/detect_drift.sh` para assegurar que a instalação limpa e o upgrade produzem schemas 100% equivalentes.
+O comando `make validate-upgrade` valida a migração incremental a partir da baseline `V0001` para todas as migrations da branch, testa a idempotência de reaplicação de migrations e seeds e invoca `scripts/detect_drift.sh` para assegurar que instalação limpa e upgrade produzem schemas equivalentes. Consulte o [Runbook Operacional (DB-020)](docs/DB-020-runbook.md) para a matriz de procedimentos exercitados na CI, exercitados localmente e pendentes (`DB-018` e `QA-024`).
 
 ## Documentação e Evidências
 
@@ -65,7 +71,14 @@ O comando `make validate-upgrade` valida a migração incremental a partir do es
 - [DB-004: Identidade, Usuário e Vínculo Acadêmico](docs/DB-004-identity-user-link.md)
 - [DB-005: Sessões, Hashes, Expiração, Revogação e Rotação de Tokens](docs/DB-005-session-tokens.md)
 - [DB-006: Papéis, Permissões e Escopos de Autorização RBAC](docs/DB-006-roles-and-scopes.md)
+- [DB-009: Persistência de Avaliações Individuais sem Banca](docs/DB-009-individual-evaluations.md)
+- [DB-010: Rubricas, Critérios e Avaliações de PI](docs/DB-010-pi-rubric-and-evaluation.md)
+- [DB-013: Atividades e Horas Vigentes de Extensão sem Histórico](docs/DB-013-extension-activities-hours.md)
 - [DB-016: Detecção de Drift Estrutural e Fixtures Determinísticas](docs/DB-016-drift-detection.md)
+- [DB-017: Consultas Lentas — Medição e Correção](docs/DB-017-query-performance.md)
+- [DB-019: Pool de Conexões do PostgreSQL 16, Guardrails e Monitoramento sob Carga](docs/DB-019-postgresql-pool-and-load.md)
+- [DB-020: Dicionário de Dados do Schema Vigente](docs/DB-020-data-dictionary.md)
+- [DB-020: Runbook Operacional e Matriz de Procedimentos Exercitados](docs/DB-020-runbook.md)
 - [Diretrizes e Catálogo de Seeds](seeds/README.md)
 - [Evidência DB-001: Segurança e Privilégios](evidence/DB-001-security.txt)
 - [Evidência DB-002: Validação de CI, Instalação Limpa e Upgrade](evidence/DB-002-ci-validation.md)
@@ -73,7 +86,13 @@ O comando `make validate-upgrade` valida a migração incremental a partir do es
 - [Evidência DB-004: Identidade, Usuário e Vínculo com Constraints e Migration Testada](evidence/DB-004-identity-user-link.md)
 - [Evidência DB-005: Sessões e Tokens com Hash, Expiração, Revogação e Índices](evidence/DB-005-session-tokens.md)
 - [Evidência DB-006: Papéis, Permissões e Escopos com Prevenção de Duplicidade](evidence/DB-006-roles-and-scopes.md)
+- [Evidência DB-009: Persistência de Avaliações Individuais sem Banca](evidence/DB-009-individual-evaluations.md)
+- [Evidência DB-010: Rubricas e Notas de PI sem Cristalização de Regras Pendentes](evidence/DB-010-pi-rubric-and-evaluation.md)
+- [Evidência DB-013: Atividades e Horas Vigentes de Extensão sem Histórico](evidence/DB-013-extension-activities-hours.md)
 - [Evidência DB-016: Detecção de Drift entre Instalação e Upgrade com Fixtures Determinísticas](evidence/DB-016-drift-detection.md)
+- [Evidência DB-017: Medição e Otimização de Consultas](evidence/DB-017-query-performance.md)
+- [Evidência DB-019: Pool do PostgreSQL 16, Guardrails e Testes Controlados de Carga](evidence/DB-019-postgresql-pool-and-load.md)
+- [Evidência DB-020: Execução Reproduzível do Runbook na CI (PostgreSQL 16)](evidence/DB-020-runbook-validation.md)
 
 ## Pendência de governança
 

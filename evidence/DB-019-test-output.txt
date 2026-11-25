@@ -1,0 +1,71 @@
+=== [DB-019] 1. Provisionando banco isolado (plataforma_pool_load_test) e role de aplicacao nao-superuser (db019_app_pool) ===
+DROP DATABASE
+DROP ROLE
+CREATE ROLE
+CREATE DATABASE
+=== [DB-019] 2. Aplicando migrations, seeds e carga sintetica deterministica (5.000 alunos / 600 projetos / 15.005 participacoes) ===
+=== [DB-019] 3. Executando Cenario S1: 10 conexoes persistentes (leitura, 10s) ===
+pgbench (16.16)
+transaction type: /tmp/db019_read.sql
+scaling factor: 1
+query mode: simple
+number of clients: 10
+number of threads: 2
+maximum number of tries: 1
+duration: 10 s
+number of transactions actually processed: 41094
+number of failed transactions: 0 (0.000%)
+latency average = 2.430 ms
+initial connection time = 19.152 ms
+tps = 4115.834696 (without initial connection time)
+=== DB-019 Pool & Resource Monitoring Summary ===
+database=plataforma_pool_load_test | window_utc=2026-11-25T03:56:11Z..2026-11-25T03:56:50Z | samples=11 | interval_s=1
+limits: max_connections=100 | superuser_reserved=3 | reserved_connections=2 | usable_regular_slots=95
+connections: peak_client=10 (avg=1.82) | peak_active=6 | peak_idle=4 | peak_idle_in_tx=0 | peak_utilization_pct=10.53%
+waits_and_xacts: peak_waiting_sessions=0 | peak_active_xacts=5 | max_xact_ms=2.59 | max_query_ms=2.59 | max_idle_in_tx_ms=0.00
+db_activity_delta: commits=164400 | rollbacks=0 | cache_hit_ratio=100.00% | deadlocks=0 | temp_files=0 (0 bytes)
+container_resources: peak_cpu_pct=890.21% | mem_last=58.06MiB / 7.731GiB (0.73%) | peak_pids=18
+log_errors_observed: conn_limit_exhausted=0 | idle_in_tx_timeout=0 | lock_timeout=0 | statement_timeout=0 | deadlocks=0
+verdict=HEALTHY_NO_EXHAUSTION
+=== [DB-019] 4. Executando Cenario S2: 40 conexoes persistentes (carga mista R/W, 10s) ===
+pgbench (16.16)
+transaction type: /tmp/db019_mixed.sql
+scaling factor: 1
+query mode: simple
+number of clients: 40
+number of threads: 4
+maximum number of tries: 1
+duration: 10 s
+number of transactions actually processed: 40158
+number of failed transactions: 0 (0.000%)
+latency average = 9.979 ms
+initial connection time = 40.879 ms
+tps = 4008.284867 (without initial connection time)
+=== DB-019 Pool & Resource Monitoring Summary ===
+database=plataforma_pool_load_test | window_utc=2026-11-25T03:56:52Z..2026-11-25T03:57:33Z | samples=11 | interval_s=1
+limits: max_connections=100 | superuser_reserved=3 | reserved_connections=2 | usable_regular_slots=95
+connections: peak_client=40 (avg=7.27) | peak_active=35 | peak_idle=7 | peak_idle_in_tx=21 | peak_utilization_pct=42.11%
+waits_and_xacts: peak_waiting_sessions=29 | peak_active_xacts=40 | max_xact_ms=12.17 | max_query_ms=6.17 | max_idle_in_tx_ms=3.20
+db_activity_delta: commits=36710 | rollbacks=0 | cache_hit_ratio=100.00% | deadlocks=0 | temp_files=0 (0 bytes)
+container_resources: peak_cpu_pct=934.05% | mem_last=57.98MiB / 7.731GiB (0.73%) | peak_pids=50
+log_errors_observed: conn_limit_exhausted=0 | idle_in_tx_timeout=0 | lock_timeout=0 | statement_timeout=0 | deadlocks=0
+verdict=HEALTHY_NO_EXHAUSTION
+=== [DB-019] 5. Executando Cenario S3: Guardrails de saturacao, slots reservados e timeouts ===
+# Cenario S3 — Guardrails de Conexao, Slots Reservados e Timeouts
+
+## 3.1 Exaustao controlada da role da aplicacao sem afetar monitoramento administrativo
+pgbench_overlimit_exit_code=0
+pgbench: error: connection to server on socket "/run/postgresql/.s.PGSQL.5432" failed: FATAL:  too many connections for role "db019_app_pool"
+admin_monitoring_alive=true
+
+## 3.2 Encerramento automatico de sessao abandonada em idle in transaction
+server_idle_in_transaction_session_timeout=1min
+FATAL:  terminating connection due to idle-in-transaction timeout
+server closed the connection unexpectedly
+
+## 3.3 Aborto controlado de espera de lock via lock_timeout
+server_lock_timeout=10s
+lock_wait_exit_code=0
+ERROR:  canceling statement due to lock timeout
+=== [DB-019] Suite local de carga e guardrails de pool concluida com sucesso! ===
+[pool_load_test] Limpando banco e role temporarios (plataforma_pool_load_test / db019_app_pool)...

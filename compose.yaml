@@ -5,6 +5,22 @@ services:
       POSTGRES_DB: plataforma
       POSTGRES_USER: plataforma
       POSTGRES_PASSWORD: local-development-only
+    command:
+      - postgres
+      - -c
+      - max_connections=${PG_MAX_CONNECTIONS:-100}
+      - -c
+      - superuser_reserved_connections=${PG_SUPERUSER_RESERVED_CONNECTIONS:-3}
+      - -c
+      - reserved_connections=${PG_RESERVED_CONNECTIONS:-2}
+      - -c
+      - idle_in_transaction_session_timeout=${PG_IDLE_IN_TX_TIMEOUT:-60s}
+      - -c
+      - lock_timeout=${PG_LOCK_TIMEOUT:-10s}
+      - -c
+      - statement_timeout=${PG_STATEMENT_TIMEOUT:-0}
+      - -c
+      - log_lock_waits=${PG_LOG_LOCK_WAITS:-on}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U plataforma -d plataforma"]
       interval: 2s
