@@ -1461,4 +1461,26 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NA
   "SELECT count(*) FROM extension.activity WHERE (title ~* '(@gmail|@hotmail|@outlook|@yahoo|@senai|@unisenai|[0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2})') OR (description ~* '(@gmail|@hotmail|@outlook|@yahoo|@senai|@unisenai|[0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2})');" \
   | grep -qx '0'
 
+echo "[validate] 46. Validando parametros de conexoes/timeouts do PostgreSQL 16 e ausencia de tabelas de monitoramento no schema funcional (DB-019)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT (
+     current_setting('max_connections')::int >= 20
+     AND current_setting('superuser_reserved_connections')::int >= 1
+     AND COALESCE((SELECT setting::int FROM pg_settings WHERE name = 'reserved_connections'), 0) >= 1
+     AND current_setting('max_connections')::int > (
+       current_setting('superuser_reserved_connections')::int
+       + COALESCE((SELECT setting::int FROM pg_settings WHERE name = 'reserved_connections'), 0)
+     )
+     AND (SELECT setting::int FROM pg_settings WHERE name = 'idle_in_transaction_session_timeout') > 0
+     AND (SELECT setting::int FROM pg_settings WHERE name = 'lock_timeout') > 0
+     AND current_setting('log_lock_waits') = 'on'
+   )::text;" \
+  | grep -qx 'true'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM information_schema.tables WHERE table_schema IN ('auth','academic_pi','extension','assets','institutional','public') AND table_name ~* '(pool_snapshot|load_test|pgbench)';" \
+  | grep -qx '0'
+
+[ -f scripts/monitor_pool.sh ] && [ -f scripts/run_pool_load_test.sh ]
+
 echo "[validate] Todas as validacoes de compatibilidade, integridade, constraints e seeds concluidas com sucesso!"
