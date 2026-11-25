@@ -81,6 +81,12 @@ Para assegurar clareza, rastreabilidade e evitar colisões entre entidades, os s
   - `academic_pi.project_participation`: 5 participações sintéticas demonstrando conformidade com as constraints reais: estudante com 1 PI e 1 Extensão ativos simultaneamente (`approved`), participação desistida (`withdrawn`), remoção justificada (`removed` com justificativa preenchida) e solicitação pendente (`requested`).
 - **Conformidade Anti-PII:** Títulos, descrições e justificativas 100% fictícios, sem menção a dados pessoais reais.
 
+### `0006_project_impact.sql`
+- **Tabelas Alvo:** `academic_pi.project_impact`, `academic_pi.project_impact_ods`
+- **Migration Mínima Exigida:** `V0015__create_project_impact.sql` (depende de `0002_identity_user_link.sql` e `0005_project_tables.sql`)
+- **Cobertura de Cenários:** 3 impactos sintéticos: aprovado e publicado (visível na visão pública), aprovado mas não publicado (retirado) e rascunho parcial; 3 vínculos ODS.
+- **Conformidade Anti-PII:** Textos 100% fictícios, valores agregados, sem dados identificáveis de beneficiários ou parceiros.
+
 ---
 
 ## 4. Execução e Validação
