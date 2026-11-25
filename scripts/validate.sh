@@ -896,4 +896,320 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NA
   "SELECT count(*) FROM academic_pi.project_participation WHERE justification IS NOT NULL AND justification ~* '(@gmail|@hotmail|@outlook|@yahoo|@senai|@unisenai|[0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2})';" \
   | grep -qx '0'
 
+echo "[validate] 38. Validando tabela extension.activity, migration V0013 e ausencia de historico/estados nao aprovados (DB-013)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'extension' AND table_name = 'activity';" \
+  | grep -qx '1'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM public.schema_migration WHERE version = 'V0013';" \
+  | grep -qx '1'
+
+# Garante ausencia de tabelas de historico de negocio e de colunas de valor anterior, status/recusa ou horas solicitadas pelo aluno
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'extension' AND table_name ~* '(history|historico|log|snapshot|audit|previous)';" \
+  | grep -qx '0'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'extension' AND table_name = 'activity' AND column_name ~* '(previous|old_|history|snapshot|requested_hours|status|rejection|refusal|reason)';" \
+  | grep -qx '0'
+
+# Garante que validated_hours usa numeric sem precisao/escala cristalizada antes da validacao do Andre
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'extension' AND table_name = 'activity' AND column_name = 'validated_hours' AND data_type = 'numeric' AND numeric_precision IS NULL AND numeric_scale IS NULL;" \
+  | grep -qx '1'
+
+echo "[validate] 39. Validando check, foreign keys, indices e trigger de extension.activity (DB-013)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid = 'extension.activity'::regclass AND contype = 'c';" \
+  | grep -qx 'activity_description_ck,activity_title_ck,activity_validated_hours_positive_ck,activity_validation_consistency_ck'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid = 'extension.activity'::regclass AND contype = 'f';" \
+  | grep -qx 'activity_last_validated_by_instructor_fk,activity_last_validated_by_user_fk,activity_participation_fk,activity_project_fk,activity_project_student_participation_fk,activity_student_user_fk'
+
+# Todas as 6 FKs usam ON DELETE RESTRICT (confdeltype = 'r')
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM pg_constraint WHERE conrelid = 'extension.activity'::regclass AND contype = 'f' AND confdeltype = 'r';" \
+  | grep -qx '6'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT string_agg(indexname, ',' ORDER BY indexname) FROM pg_indexes WHERE schemaname = 'extension' AND tablename = 'activity' AND indexname LIKE 'idx_%';" \
+  | grep -qx 'idx_activity_last_validated_by,idx_activity_participation_id,idx_activity_project_id,idx_activity_student_id'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM pg_trigger WHERE NOT tgisinternal AND tgrelid = 'extension.activity'::regclass AND tgname = 'activity_participation_and_window_trg';" \
+  | grep -qx '1'
+
+echo "[validate] 40. Validando regras funcionais de atividades e horas vigentes de Extensao sem historico (DO block)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" <<'EOF'
+DO $$
+DECLARE
+  v_inst_resp_1 uuid := 'f1300000-0000-4000-8000-000000000001';
+  v_inst_resp_2 uuid := 'f1300000-0000-4000-8000-000000000002';
+  v_inst_other uuid := 'f1300000-0000-4000-8000-000000000003';
+  v_student_ok uuid := 'f1300000-0000-4000-8000-000000000004';
+  v_student_req uuid := 'f1300000-0000-4000-8000-000000000005';
+  v_student_pi uuid := 'f1300000-0000-4000-8000-000000000006';
+  v_student_exp uuid := 'f1300000-0000-4000-8000-000000000007';
+
+  v_proj_open uuid := 'f1300000-0000-4000-8000-000000000101';
+  v_proj_closed uuid := 'f1300000-0000-4000-8000-000000000102';
+  v_proj_cont uuid := 'f1300000-0000-4000-8000-000000000103';
+  v_proj_pi_only uuid := 'f1300000-0000-4000-8000-000000000104';
+
+  v_part_open uuid := 'f1300000-0000-4000-8000-000000000201';
+  v_part_req uuid := 'f1300000-0000-4000-8000-000000000202';
+  v_part_closed uuid := 'f1300000-0000-4000-8000-000000000203';
+  v_part_cont uuid := 'f1300000-0000-4000-8000-000000000204';
+  v_part_pi uuid := 'f1300000-0000-4000-8000-000000000205';
+
+  v_act_open uuid := 'f1300000-0000-4000-8000-000000000301';
+  v_act_closed uuid := 'f1300000-0000-4000-8000-000000000302';
+  v_act_cont uuid := 'f1300000-0000-4000-8000-000000000303';
+
+  v_initial_count bigint;
+BEGIN
+  SELECT count(*) INTO v_initial_count FROM extension.activity;
+
+  INSERT INTO auth."user" (id, email, full_name, status) VALUES
+    (v_inst_resp_1, 'db013.resp1@synthetic.local', 'DB013 Responsible Instructor One', 'active'),
+    (v_inst_resp_2, 'db013.resp2@synthetic.local', 'DB013 Responsible Instructor Two', 'active'),
+    (v_inst_other, 'db013.other@synthetic.local', 'DB013 Non Responsible Instructor', 'active'),
+    (v_student_ok, 'db013.student.ok@synthetic.local', 'DB013 Approved Student', 'active'),
+    (v_student_req, 'db013.student.req@synthetic.local', 'DB013 Requested Student', 'active'),
+    (v_student_pi, 'db013.student.pi@synthetic.local', 'DB013 PI Only Student', 'active'),
+    (v_student_exp, 'db013.student.exp@synthetic.local', 'DB013 Closed Project Student', 'active');
+
+  -- Projetos: Extensao em andamento, Extensao encerrada, Extensao continua (ends_at NULL) e apenas PI
+  INSERT INTO academic_pi.project (id, title, is_pi, is_extension, status, starts_at, ends_at) VALUES
+    (v_proj_open, 'DB013 Open Extension Project', false, true, 'published', now() - interval '15 days', now() + interval '15 days'),
+    (v_proj_closed, 'DB013 Closed Extension Project', false, true, 'published', now() - interval '40 days', now() - interval '2 days'),
+    (v_proj_cont, 'DB013 Continuous Extension Project', false, true, 'published', now() - interval '10 days', NULL),
+    (v_proj_pi_only, 'DB013 PI Only Project', true, false, 'published', now() - interval '15 days', now() + interval '15 days');
+
+  INSERT INTO academic_pi.project_instructor (id, project_id, instructor_id) VALUES
+    ('f1300000-0000-4000-8000-000000000401', v_proj_open, v_inst_resp_1),
+    ('f1300000-0000-4000-8000-000000000402', v_proj_open, v_inst_resp_2),
+    ('f1300000-0000-4000-8000-000000000403', v_proj_closed, v_inst_resp_1),
+    ('f1300000-0000-4000-8000-000000000404', v_proj_cont, v_inst_resp_1),
+    ('f1300000-0000-4000-8000-000000000405', v_proj_pi_only, v_inst_resp_1);
+
+  -- Participacoes: aprovadas em cada projeto (respeitando 1 Extensao ativa por aluno) e uma pendente
+  INSERT INTO academic_pi.project_participation (id, project_id, is_pi, is_extension, student_id, status) VALUES
+    (v_part_open, v_proj_open, false, true, v_student_ok, 'approved'),
+    (v_part_req, v_proj_open, false, true, v_student_req, 'requested'),
+    (v_part_closed, v_proj_closed, false, true, v_student_exp, 'approved'),
+    (v_part_cont, v_proj_cont, false, true, v_student_pi, 'approved'),
+    (v_part_pi, v_proj_pi_only, true, false, v_student_pi, 'approved');
+
+  -- Teste 1: FKs e vinculo exato com a participacao do aluno
+  BEGIN
+    INSERT INTO extension.activity (id, participation_id, project_id, student_id, title, description)
+    VALUES (gen_random_uuid(), 'f1300000-0000-4000-8000-000000000999', v_proj_open, v_student_ok, 'Titulo Valido', 'Descricao valida');
+    RAISE EXCEPTION 'FK falhou ao permitir participation_id inexistente';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  -- participation_id pertence a v_part_closed, mas project_id/student_id apontam para v_part_open
+  BEGIN
+    INSERT INTO extension.activity (id, participation_id, project_id, student_id, title, description)
+    VALUES (gen_random_uuid(), v_part_closed, v_proj_open, v_student_ok, 'Vinculo Cruzado', 'Descricao valida');
+    RAISE EXCEPTION 'Trigger falhou ao permitir participation_id divergente de (project_id, student_id)';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  -- Projeto exclusivamente PI (is_extension = false) nao aceita atividade de Extensao
+  BEGIN
+    INSERT INTO extension.activity (id, participation_id, project_id, student_id, title, description)
+    VALUES (gen_random_uuid(), v_part_pi, v_proj_pi_only, v_student_pi, 'Atividade em PI', 'Descricao valida');
+    RAISE EXCEPTION 'Trigger falhou ao permitir atividade de Extensao em participacao sem is_extension';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  -- Participacao nao aprovada (status = requested) nao pode enviar atividade
+  BEGIN
+    INSERT INTO extension.activity (id, participation_id, project_id, student_id, title, description)
+    VALUES (gen_random_uuid(), v_part_req, v_proj_open, v_student_req, 'Atividade sem aprovacao', 'Descricao valida');
+    RAISE EXCEPTION 'Trigger falhou ao permitir atividade em participacao requested';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  -- Titulo ou descricao vazios sao rejeitados
+  BEGIN
+    INSERT INTO extension.activity (id, participation_id, project_id, student_id, title, description)
+    VALUES (gen_random_uuid(), v_part_open, v_proj_open, v_student_ok, '   ', 'Descricao valida');
+    RAISE EXCEPTION 'Constraint activity_title_ck falhou ao permitir titulo vazio';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  BEGIN
+    INSERT INTO extension.activity (id, participation_id, project_id, student_id, title, description)
+    VALUES (gen_random_uuid(), v_part_open, v_proj_open, v_student_ok, 'Titulo Valido', '   ');
+    RAISE EXCEPTION 'Constraint activity_description_ck falhou ao permitir descricao vazia';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  -- Teste 2: Regras de prazo aprovadas (envio e correcao dentro do periodo; bloqueio apos encerramento)
+  INSERT INTO extension.activity (id, participation_id, project_id, student_id, title, description, submitted_at)
+  VALUES
+    (v_act_open, v_part_open, v_proj_open, v_student_ok, 'Oficina Inicial', 'Descricao inicial enviada no prazo.', now()),
+    (v_act_closed, v_part_closed, v_proj_closed, v_student_exp, 'Atividade Enviada no Prazo', 'Registrada quando o projeto estava aberto.', now() - interval '10 days'),
+    (v_act_cont, v_part_cont, v_proj_cont, v_student_pi, 'Atividade Continua', 'Projeto continuo sem ends_at.', now());
+
+  -- Aluno corrige informacoes durante o periodo aberto (substitui valor vigente sem historico)
+  UPDATE extension.activity
+  SET title = 'Oficina Inicial Corrigida',
+      description = 'Descricao corrigida dentro do periodo do projeto.',
+      submitted_at = now(),
+      updated_at = now()
+  WHERE id = v_act_open;
+
+  -- Envio antes de starts_at ou apos ends_at deve ser rejeitado
+  BEGIN
+    INSERT INTO extension.activity (id, participation_id, project_id, student_id, title, description, submitted_at)
+    VALUES (gen_random_uuid(), v_part_open, v_proj_open, v_student_ok, 'Antes do inicio', 'Fora da janela.', now() - interval '30 days');
+    RAISE EXCEPTION 'Trigger falhou ao permitir envio anterior a starts_at';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  BEGIN
+    INSERT INTO extension.activity (id, participation_id, project_id, student_id, title, description, submitted_at)
+    VALUES (gen_random_uuid(), v_part_closed, v_proj_closed, v_student_exp, 'Apos o encerramento', 'Fora do prazo.', now());
+    RAISE EXCEPTION 'Trigger falhou ao permitir envio apos ends_at do projeto';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  -- Alteracao de informacoes pelo aluno apos encerramento do prazo do projeto deve ser rejeitada
+  BEGIN
+    UPDATE extension.activity
+    SET description = 'Tentativa de alteracao apos encerramento do prazo'
+    WHERE id = v_act_closed;
+    RAISE EXCEPTION 'Trigger falhou ao permitir edicao discente apos encerramento de ends_at';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  -- Teste 3: Somente o docente responsavel define a quantidade de horas e valida as horas
+  -- Horas sem validador/instante ou <= 0 sao rejeitadas
+  BEGIN
+    UPDATE extension.activity
+    SET validated_hours = 4
+    WHERE id = v_act_open;
+    RAISE EXCEPTION 'Constraint activity_validation_consistency_ck falhou ao permitir horas sem validador';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  BEGIN
+    UPDATE extension.activity
+    SET validated_hours = 0, last_validated_by = v_inst_resp_1, last_validated_at = now()
+    WHERE id = v_act_open;
+    RAISE EXCEPTION 'Constraint activity_validated_hours_positive_ck falhou ao permitir horas <= 0';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  -- Docente NAO responsavel pelo projeto e o proprio aluno sao bloqueados ao tentar validar horas
+  BEGIN
+    UPDATE extension.activity
+    SET validated_hours = 4, last_validated_by = v_inst_other, last_validated_at = now()
+    WHERE id = v_act_open;
+    RAISE EXCEPTION 'Constraint activity_last_validated_by_instructor_fk falhou ao permitir docente nao responsavel';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  BEGIN
+    UPDATE extension.activity
+    SET validated_hours = 4, last_validated_by = v_student_ok, last_validated_at = now()
+    WHERE id = v_act_open;
+    RAISE EXCEPTION 'Constraint activity_last_validated_by_instructor_fk falhou ao permitir validacao pelo aluno';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  -- Docente responsavel valida horas no projeto aberto e tambem apos o encerramento do prazo discente
+  UPDATE extension.activity
+  SET validated_hours = 4.5,
+      last_validated_by = v_inst_resp_1,
+      last_validated_at = now() - interval '1 hour',
+      updated_at = now() - interval '1 hour'
+  WHERE id = v_act_open;
+
+  UPDATE extension.activity
+  SET validated_hours = 3,
+      last_validated_by = v_inst_resp_1,
+      last_validated_at = now(),
+      updated_at = now()
+  WHERE id = v_act_closed;
+
+  -- Teste 4: Alteracao substitui o valor vigente e quem validou por ultimo, sem historico anterior
+  UPDATE extension.activity
+  SET validated_hours = 6.75,
+      last_validated_by = v_inst_resp_2,
+      last_validated_at = now(),
+      updated_at = now()
+  WHERE id = v_act_open;
+
+  IF (SELECT count(*) FROM extension.activity WHERE id = v_act_open) <> 1 THEN
+    RAISE EXCEPTION 'Atualizacao deveria manter exatamente 1 registro vigente';
+  END IF;
+
+  IF (SELECT validated_hours FROM extension.activity WHERE id = v_act_open) <> 6.75
+     OR (SELECT last_validated_by FROM extension.activity WHERE id = v_act_open) <> v_inst_resp_2 THEN
+    RAISE EXCEPTION 'Atualizacao nao substituiu horas vigentes ou ultimo validador';
+  END IF;
+
+  -- Teste 5: ON DELETE RESTRICT impede orfaos em projeto, participacao, docente validador e usuario
+  BEGIN
+    DELETE FROM academic_pi.project WHERE id = v_proj_open;
+    RAISE EXCEPTION 'ON DELETE RESTRICT falhou ao permitir excluir projeto com atividades';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  BEGIN
+    DELETE FROM academic_pi.project_participation WHERE id = v_part_open;
+    RAISE EXCEPTION 'ON DELETE RESTRICT falhou ao permitir excluir participacao com atividades';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  BEGIN
+    DELETE FROM academic_pi.project_instructor WHERE project_id = v_proj_open AND instructor_id = v_inst_resp_2;
+    RAISE EXCEPTION 'ON DELETE RESTRICT falhou ao permitir remover docente responsavel que validou horas';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  -- Limpeza integral dos dados sinteticos de teste
+  DELETE FROM extension.activity WHERE project_id IN (v_proj_open, v_proj_closed, v_proj_cont, v_proj_pi_only);
+  DELETE FROM academic_pi.project_participation WHERE project_id IN (v_proj_open, v_proj_closed, v_proj_cont, v_proj_pi_only);
+  DELETE FROM academic_pi.project_instructor WHERE project_id IN (v_proj_open, v_proj_closed, v_proj_cont, v_proj_pi_only);
+  DELETE FROM academic_pi.project WHERE id IN (v_proj_open, v_proj_closed, v_proj_cont, v_proj_pi_only);
+  DELETE FROM auth."user" WHERE id IN (v_inst_resp_1, v_inst_resp_2, v_inst_other, v_student_ok, v_student_req, v_student_pi, v_student_exp);
+
+  IF (SELECT count(*) FROM extension.activity) <> v_initial_count THEN
+    RAISE EXCEPTION 'Limpeza de extension.activity deixou residuos ou alterou contagem de seeds';
+  END IF;
+END $$;
+EOF
+
+echo "[validate] 41. Validando presenca, cobertura, determinismo e Anti-PII dos seeds em extension.activity (DB-013)..."
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT (count(*) >= 5)::text FROM extension.activity;" \
+  | grep -qx 'true'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM extension.activity WHERE id::text NOT LIKE 'e1300000-0000-4000-8000-%';" \
+  | grep -qx '0'
+
+# Cobertura de atividades com horas vigentes validadas e atividades aguardando validacao
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT ((count(*) FILTER (WHERE validated_hours IS NOT NULL) >= 1) AND (count(*) FILTER (WHERE validated_hours IS NULL) >= 1))::text FROM extension.activity;" \
+  | grep -qx 'true'
+
+# Todas as horas vigentes nos seeds pertencem a docente responsavel valido do projeto
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM extension.activity a WHERE a.validated_hours IS NOT NULL AND NOT EXISTS (SELECT 1 FROM academic_pi.project_instructor pi WHERE pi.project_id = a.project_id AND pi.instructor_id = a.last_validated_by);" \
+  | grep -qx '0'
+
+# Conformidade Anti-PII nos textos das atividades
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM extension.activity WHERE (title ~* '(@gmail|@hotmail|@outlook|@yahoo|@senai|@unisenai|[0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2})') OR (description ~* '(@gmail|@hotmail|@outlook|@yahoo|@senai|@unisenai|[0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2})');" \
+  | grep -qx '0'
+
 echo "[validate] Todas as validacoes de compatibilidade, integridade, constraints e seeds concluidas com sucesso!"

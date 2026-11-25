@@ -43,9 +43,10 @@ if [ "$expected_versions" != "$applied_versions" ]; then
   exit 1
 fi
 
-# Confirma explicitamente a presenca de V0006 e V0008
+# Confirma explicitamente a presenca de V0006, V0008 e V0013
 echo "$applied_versions" | grep -q 'V0006' || (echo "ERRO: V0006 ausente no upgrade" >&2 && exit 1)
 echo "$applied_versions" | grep -q 'V0008' || (echo "ERRO: V0008 ausente no upgrade" >&2 && exit 1)
+echo "$applied_versions" | grep -q 'V0013' || (echo "ERRO: V0013 ausente no upgrade" >&2 && exit 1)
 
 # 6. Valida idempotencia de migrations: reexecuta migrate.sh no banco atualizado
 echo "6. Testando idempotencia de migrations (reexecutando migrate.sh no banco atualizado)..."
