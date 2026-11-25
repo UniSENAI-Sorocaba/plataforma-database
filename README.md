@@ -65,6 +65,7 @@ O comando `make validate-upgrade` valida a migração incremental a partir do es
 - [DB-004: Identidade, Usuário e Vínculo Acadêmico](docs/DB-004-identity-user-link.md)
 - [DB-005: Sessões, Hashes, Expiração, Revogação e Rotação de Tokens](docs/DB-005-session-tokens.md)
 - [DB-006: Papéis, Permissões e Escopos de Autorização RBAC](docs/DB-006-roles-and-scopes.md)
+- [DB-009: Persistência de Avaliações Individuais sem Banca](docs/DB-009-individual-evaluations.md)
 - [DB-016: Detecção de Drift Estrutural e Fixtures Determinísticas](docs/DB-016-drift-detection.md)
 - [Diretrizes e Catálogo de Seeds](seeds/README.md)
 - [Evidência DB-001: Segurança e Privilégios](evidence/DB-001-security.txt)
@@ -73,6 +74,7 @@ O comando `make validate-upgrade` valida a migração incremental a partir do es
 - [Evidência DB-004: Identidade, Usuário e Vínculo com Constraints e Migration Testada](evidence/DB-004-identity-user-link.md)
 - [Evidência DB-005: Sessões e Tokens com Hash, Expiração, Revogação e Índices](evidence/DB-005-session-tokens.md)
 - [Evidência DB-006: Papéis, Permissões e Escopos com Prevenção de Duplicidade](evidence/DB-006-roles-and-scopes.md)
+- [Evidência DB-009: Persistência de Avaliações Individuais sem Banca](evidence/DB-009-individual-evaluations.md)
 - [Evidência DB-016: Detecção de Drift entre Instalação e Upgrade com Fixtures Determinísticas](evidence/DB-016-drift-detection.md)
 
 ## Pendência de governança
