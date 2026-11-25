@@ -902,12 +902,16 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NA
   | grep -qx 'project_impact,project_impact_ods,public_project_impact'
 
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
-  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid = 'academic_pi.project_impact'::regclass AND contype IN ('c', 'f');" \
-  | grep -qx 'project_impact_activity_hours_ck,project_impact_approval_ck,project_impact_approved_by_fk,project_impact_beneficiaries_served_ck,project_impact_declared_by_fk,project_impact_partners_involved_ck,project_impact_period_ck,project_impact_project_fk,project_impact_publication_ck,project_impact_text_fields_ck'
+  "SELECT (count(*) FILTER (WHERE conname IN ('project_impact_activity_hours_ck','project_impact_approval_ck','project_impact_approved_by_fk','project_impact_approved_ck','project_impact_beneficiaries_served_ck','project_impact_declared_by_fk','project_impact_partners_involved_ck','project_impact_period_ck','project_impact_project_fk','project_impact_status_ck','project_impact_text_fields_ck')))::text || ',' || count(*)::text FROM pg_constraint WHERE conrelid = 'academic_pi.project_impact'::regclass AND contype IN ('c', 'f');" \
+  | grep -qx '11,11'
 
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
   "SELECT count(*) FROM public.schema_migration WHERE version = 'V0015';" \
   | grep -qx '1'
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
+  "SELECT count(*) FROM pg_trigger WHERE NOT tgisinternal AND tgrelid IN ('academic_pi.project_impact'::regclass, 'academic_pi.project_impact_ods'::regclass);" \
+  | grep -qx '2'
 
 echo "[validate] 39. Validando que nao existe historico/versionamento de impacto e que a visao publica nao expoe dado interno (DB-015)..."
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
@@ -915,7 +919,7 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NA
   | grep -qx '0'
 
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
-  "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'academic_pi' AND table_name = 'public_project_impact' AND column_name IN ('evidence_text', 'declared_by', 'approved_by', 'approved_at', 'is_published');" \
+  "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'academic_pi' AND table_name = 'public_project_impact' AND column_name IN ('declared_by', 'approved_by', 'approved_at', 'status');" \
   | grep -qx '0'
 
 echo "[validate] 40. Validando regras funcionais do impacto social (DO block)..."
@@ -927,8 +931,9 @@ DECLARE
   v_project_pub uuid := 'e2000000-0000-4000-8000-000000000011';
   v_project_draft uuid := 'e2000000-0000-4000-8000-000000000012';
   v_impact uuid := 'e2000000-0000-4000-8000-000000000101';
-  v_impact_draft uuid := 'e2000000-0000-4000-8000-000000000102';
   v_impact_hidden uuid := 'e2000000-0000-4000-8000-000000000103';
+  v_approved_1 timestamptz := '2026-11-01 10:00:00+00';
+  v_approved_2 timestamptz := '2026-11-02 10:00:00+00';
   v_n int;
   v_summary text;
 BEGIN
@@ -940,14 +945,23 @@ BEGIN
   VALUES (v_project_pub, 'Synthetic DB-015 public project', true, 'published', true),
          (v_project_draft, 'Synthetic DB-015 draft project', true, 'draft', false);
 
-  -- Teste 1: rascunho parcial e aceito (campos obrigatorios so valem na publicacao)
+  -- Teste 1: rascunho parcial e aceito e o estado padrao e draft
   INSERT INTO academic_pi.project_impact (id, project_id, summary, declared_by)
   VALUES (v_impact, v_project_pub, 'Resumo sintetico', v_responsible);
 
-  -- Teste 2: publicacao sem aprovacao e sem campos obrigatorios e rejeitada
+  SELECT count(*) INTO v_n FROM academic_pi.project_impact WHERE id = v_impact AND status = 'draft';
+  IF v_n <> 1 THEN RAISE EXCEPTION 'estado padrao deveria ser draft'; END IF;
+
+  -- Teste 2: estado invalido e aprovacao incompleta sao rejeitados
   BEGIN
-    UPDATE academic_pi.project_impact SET is_published = true WHERE id = v_impact;
-    RAISE EXCEPTION 'project_impact_publication_ck falhou ao permitir publicar rascunho';
+    UPDATE academic_pi.project_impact SET status = 'published' WHERE id = v_impact;
+    RAISE EXCEPTION 'project_impact_status_ck falhou ao permitir estado invalido';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  BEGIN
+    UPDATE academic_pi.project_impact SET status = 'approved' WHERE id = v_impact;
+    RAISE EXCEPTION 'project_impact_approved_ck falhou ao permitir aprovar rascunho incompleto';
   EXCEPTION WHEN check_violation THEN NULL;
   END;
 
@@ -1005,7 +1019,7 @@ BEGIN
   EXCEPTION WHEN foreign_key_violation THEN NULL;
   END;
 
-  -- Teste 7: ODS valido, duplicado e fora da faixa
+  -- Teste 7: ODS valido, duplicado e fora da faixa (rascunho aceita alteracao de ODS)
   INSERT INTO academic_pi.project_impact_ods (impact_id, ods_code) VALUES (v_impact, 4), (v_impact, 17);
 
   BEGIN
@@ -1030,40 +1044,73 @@ BEGIN
   SELECT count(*) INTO v_n FROM academic_pi.public_project_impact WHERE id = v_impact;
   IF v_n <> 0 THEN RAISE EXCEPTION 'rascunho apareceu na consulta publica'; END IF;
 
-  -- Teste 9: publicacao completa e aprovada aparece com os ODS, sem dado interno
+  -- Teste 9: aprovacao completa aparece na consulta publica com os ODS e sem dado interno
   UPDATE academic_pi.project_impact
      SET summary = 'Resumo sintetico', beneficiary_audience = 'Publico sintetico',
          period_start = '2026-01-01', period_end = '2026-06-30', territory = 'Territorio sintetico',
          observed_result = 'Resultado sintetico', evidence_text = 'Evidencia sintetica',
          beneficiaries_served = 0, activity_hours = 12.50, partners_involved = 0,
-         approved_by = v_coordinator, approved_at = now(), is_published = true
+         approved_by = v_coordinator, approved_at = v_approved_1, status = 'approved'
    WHERE id = v_impact;
 
   SELECT count(*) INTO v_n FROM academic_pi.public_project_impact WHERE id = v_impact AND ods_codes = ARRAY[4, 17]::smallint[];
-  IF v_n <> 1 THEN RAISE EXCEPTION 'impacto publicado nao apareceu na consulta publica com seus ODS'; END IF;
+  IF v_n <> 1 THEN RAISE EXCEPTION 'impacto aprovado nao apareceu na consulta publica com seus ODS'; END IF;
 
-  -- Teste 10: correcao substitui o conteudo vigente (sem versoes)
-  UPDATE academic_pi.project_impact SET summary = 'Resumo corrigido sintetico' WHERE id = v_impact;
+  -- Teste 10: conteudo aprovado nao muda sem nova aprovacao (publicacao nunca e implicita)
+  BEGIN
+    UPDATE academic_pi.project_impact SET summary = 'Alteracao silenciosa' WHERE id = v_impact;
+    RAISE EXCEPTION 'guarda falhou ao permitir alterar conteudo aprovado';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  BEGIN
+    INSERT INTO academic_pi.project_impact_ods (impact_id, ods_code) VALUES (v_impact, 5);
+    RAISE EXCEPTION 'guarda falhou ao permitir incluir ODS em impacto aprovado';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  BEGIN
+    DELETE FROM academic_pi.project_impact_ods WHERE impact_id = v_impact AND ods_code = 4;
+    RAISE EXCEPTION 'guarda falhou ao permitir remover ODS de impacto aprovado';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  -- Teste 11: correcao = sair de approved, editar e aprovar de novo com NOVA aprovacao (substitui o vigente)
+  UPDATE academic_pi.project_impact SET status = 'draft', summary = 'Resumo corrigido sintetico' WHERE id = v_impact;
+
+  SELECT count(*) INTO v_n FROM academic_pi.public_project_impact WHERE id = v_impact;
+  IF v_n <> 0 THEN RAISE EXCEPTION 'impacto em correcao nao deveria estar na consulta publica'; END IF;
+
+  INSERT INTO academic_pi.project_impact_ods (impact_id, ods_code) VALUES (v_impact, 5);
+
+  BEGIN
+    UPDATE academic_pi.project_impact SET status = 'approved' WHERE id = v_impact;
+    RAISE EXCEPTION 'guarda falhou ao permitir reaprovar sem novo approved_at';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  UPDATE academic_pi.project_impact SET status = 'approved', approved_at = v_approved_2 WHERE id = v_impact;
+
   SELECT summary INTO v_summary FROM academic_pi.public_project_impact WHERE id = v_impact;
   IF v_summary <> 'Resumo corrigido sintetico' THEN RAISE EXCEPTION 'correcao nao substituiu o conteudo vigente'; END IF;
 
-  -- Teste 11: retirada tira o conteudo da consulta publica imediatamente
-  UPDATE academic_pi.project_impact SET is_published = false WHERE id = v_impact;
+  -- Teste 12: retirada tira o conteudo da consulta publica imediatamente
+  UPDATE academic_pi.project_impact SET status = 'retired' WHERE id = v_impact;
   SELECT count(*) INTO v_n FROM academic_pi.public_project_impact WHERE id = v_impact;
   IF v_n <> 0 THEN RAISE EXCEPTION 'impacto retirado continuou na consulta publica'; END IF;
 
-  -- Teste 12: impacto publicado de projeto nao publicado/nao publico nao aparece
+  -- Teste 13: impacto aprovado de projeto nao publicado/nao publico nao aparece
   INSERT INTO academic_pi.project_impact (
-    id, project_id, summary, beneficiary_audience, period_start, period_end, territory,
+    id, project_id, status, summary, beneficiary_audience, period_start, period_end, territory,
     observed_result, evidence_text, beneficiaries_served, activity_hours, partners_involved,
-    declared_by, approved_by, approved_at, is_published)
+    declared_by, approved_by, approved_at)
   VALUES (
-    v_impact_hidden, v_project_draft, 'Resumo', 'Publico', '2026-01-01', '2026-02-01', 'Territorio',
-    'Resultado', 'Evidencia', 1, 1.00, 1, v_responsible, v_coordinator, now(), true);
+    v_impact_hidden, v_project_draft, 'approved', 'Resumo', 'Publico', '2026-01-01', '2026-02-01', 'Territorio',
+    'Resultado', 'Evidencia', 1, 1.00, 1, v_responsible, v_coordinator, v_approved_1);
   SELECT count(*) INTO v_n FROM academic_pi.public_project_impact WHERE id = v_impact_hidden;
   IF v_n <> 0 THEN RAISE EXCEPTION 'impacto de projeto nao publico apareceu na consulta publica'; END IF;
 
-  -- Teste 13: usuario declarante com impacto nao pode ser removido
+  -- Teste 14: usuario declarante com impacto nao pode ser removido
   BEGIN
     DELETE FROM auth."user" WHERE id = v_responsible;
     RAISE EXCEPTION 'ON DELETE RESTRICT falhou ao permitir remover declarante de impacto';
@@ -1071,7 +1118,7 @@ BEGIN
   END;
 
   -- Limpeza dos dados sinteticos do teste (ODS removido em cascata)
-  DELETE FROM academic_pi.project_impact WHERE id IN (v_impact, v_impact_draft, v_impact_hidden);
+  DELETE FROM academic_pi.project_impact WHERE id IN (v_impact, v_impact_hidden);
   DELETE FROM academic_pi.project WHERE id IN (v_project_pub, v_project_draft);
   DELETE FROM auth."user" WHERE id IN (v_responsible, v_coordinator);
 END $$;
@@ -1079,7 +1126,7 @@ EOF
 
 echo "[validate] 41. Validando seeds e ausencia de residuos do impacto social (DB-015)..."
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
-  "SELECT (SELECT count(*) FROM academic_pi.project_impact) || ',' || (SELECT count(*) FROM academic_pi.project_impact WHERE is_published) || ',' || (SELECT count(*) FROM academic_pi.public_project_impact) || ',' || (SELECT count(*) FROM academic_pi.project_impact_ods);" \
+  "SELECT (SELECT count(*) FROM academic_pi.project_impact) || ',' || (SELECT count(*) FROM academic_pi.project_impact WHERE status = 'approved') || ',' || (SELECT count(*) FROM academic_pi.public_project_impact) || ',' || (SELECT count(*) FROM academic_pi.project_impact_ods);" \
   | grep -qx '3,1,1,3'
 
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \

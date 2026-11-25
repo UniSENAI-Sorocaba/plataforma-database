@@ -20,12 +20,13 @@ INSERT INTO academic_pi.project_impact (
     declared_by,
     approved_by,
     approved_at,
-    is_published,
+    status,
     created_at,
     updated_at
 )
 VALUES
-    -- Impacto 1: aprovado e publicado (projeto 101 e publicado e publico)
+    -- Impacto 1: aprovado = publicado (projeto 101 e publicado e publico). Entra como draft e e aprovado ao final,
+    -- porque ODS de impacto aprovado so mudam apos nova aprovacao (guarda da V0015)
     (
         'b0000000-0000-4000-8000-000000000201',
         'b0000000-0000-4000-8000-000000000101',
@@ -40,13 +41,13 @@ VALUES
         48.50,
         2,
         'b0000000-0000-4000-8000-000000000002',
-        'b0000000-0000-4000-8000-000000000003',
-        '2026-07-05 10:00:00+00',
-        true,
+        NULL,
+        NULL,
+        'draft',
         '2026-07-01 10:00:00+00',
         '2026-07-05 10:00:00+00'
     ),
-    -- Impacto 2: aprovado, mas retirado/nao publicado (nao pode aparecer na consulta publica)
+    -- Impacto 2: retirado (retired), nao pode aparecer na consulta publica
     (
         'b0000000-0000-4000-8000-000000000202',
         'b0000000-0000-4000-8000-000000000102',
@@ -63,11 +64,11 @@ VALUES
         'b0000000-0000-4000-8000-000000000002',
         'b0000000-0000-4000-8000-000000000003',
         '2026-06-10 10:00:00+00',
-        false,
+        'retired',
         '2026-06-01 10:00:00+00',
         '2026-06-10 10:00:00+00'
     ),
-    -- Impacto 3: rascunho parcial (campos opcionais ainda vazios), sem aprovacao
+    -- Impacto 3: rascunho (draft) parcial, sem aprovacao
     (
         'b0000000-0000-4000-8000-000000000203',
         'b0000000-0000-4000-8000-000000000103',
@@ -84,17 +85,32 @@ VALUES
         'b0000000-0000-4000-8000-000000000002',
         NULL,
         NULL,
-        false,
+        'draft',
         '2026-08-01 10:00:00+00',
         '2026-08-01 10:00:00+00'
     )
 ON CONFLICT (id) DO NOTHING;
 
+-- NOT EXISTS (e nao ON CONFLICT): o trigger de guarda dispara antes da checagem de conflito
 INSERT INTO academic_pi.project_impact_ods (impact_id, ods_code)
-VALUES
-    ('b0000000-0000-4000-8000-000000000201', 4),
-    ('b0000000-0000-4000-8000-000000000201', 10),
-    ('b0000000-0000-4000-8000-000000000202', 11)
-ON CONFLICT (impact_id, ods_code) DO NOTHING;
+SELECT v.impact_id, v.ods_code
+FROM (VALUES
+    ('b0000000-0000-4000-8000-000000000201'::uuid, 4::smallint),
+    ('b0000000-0000-4000-8000-000000000201'::uuid, 10::smallint),
+    ('b0000000-0000-4000-8000-000000000202'::uuid, 11::smallint)
+) AS v (impact_id, ods_code)
+WHERE NOT EXISTS (
+    SELECT 1 FROM academic_pi.project_impact_ods o
+    WHERE o.impact_id = v.impact_id AND o.ods_code = v.ods_code
+);
+
+-- Aprovacao do impacto 1 (idempotente: so age enquanto estiver em draft)
+UPDATE academic_pi.project_impact
+SET status = 'approved',
+    approved_by = 'b0000000-0000-4000-8000-000000000003',
+    approved_at = '2026-07-05 10:00:00+00',
+    updated_at = '2026-07-05 10:00:00+00'
+WHERE id = 'b0000000-0000-4000-8000-000000000201'
+  AND status = 'draft';
 
 COMMIT;
