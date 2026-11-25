@@ -46,10 +46,16 @@ make validate-upgrade
 # 6. Ou executa a detecção de drift diretamente entre dois bancos
 make detect-drift
 
-# 7. Ou executa todas as validações de uma vez
+# 7. Monitora conexões, esperas, transações e recursos do PostgreSQL sob carga (DB-019)
+make monitor-pool
+
+# 8. Executa suíte local controlada de concorrência de pool e guardrails de timeout (DB-019)
+make test-pool
+
+# 9. Ou executa todas as validações estruturais de uma vez
 make test
 
-# 8. Encerra e remove os containers locais
+# 10. Encerra e remove os containers locais
 make down
 ```
 
@@ -66,6 +72,8 @@ O comando `make validate-upgrade` valida a migração incremental a partir do es
 - [DB-005: Sessões, Hashes, Expiração, Revogação e Rotação de Tokens](docs/DB-005-session-tokens.md)
 - [DB-006: Papéis, Permissões e Escopos de Autorização RBAC](docs/DB-006-roles-and-scopes.md)
 - [DB-016: Detecção de Drift Estrutural e Fixtures Determinísticas](docs/DB-016-drift-detection.md)
+- [DB-017: Consultas Lentas — Medição e Correção](docs/DB-017-query-performance.md)
+- [DB-019: Pool de Conexões do PostgreSQL 16, Guardrails e Monitoramento sob Carga](docs/DB-019-postgresql-pool-and-load.md)
 - [Diretrizes e Catálogo de Seeds](seeds/README.md)
 - [Evidência DB-001: Segurança e Privilégios](evidence/DB-001-security.txt)
 - [Evidência DB-002: Validação de CI, Instalação Limpa e Upgrade](evidence/DB-002-ci-validation.md)
@@ -74,6 +82,8 @@ O comando `make validate-upgrade` valida a migração incremental a partir do es
 - [Evidência DB-005: Sessões e Tokens com Hash, Expiração, Revogação e Índices](evidence/DB-005-session-tokens.md)
 - [Evidência DB-006: Papéis, Permissões e Escopos com Prevenção de Duplicidade](evidence/DB-006-roles-and-scopes.md)
 - [Evidência DB-016: Detecção de Drift entre Instalação e Upgrade com Fixtures Determinísticas](evidence/DB-016-drift-detection.md)
+- [Evidência DB-017: Medição e Otimização de Consultas](evidence/DB-017-query-performance.md)
+- [Evidência DB-019: Pool do PostgreSQL 16, Guardrails e Testes Controlados de Carga](evidence/DB-019-postgresql-pool-and-load.md)
 
 ## Pendência de governança
 
