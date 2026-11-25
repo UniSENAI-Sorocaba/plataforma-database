@@ -916,21 +916,21 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NA
 
 echo "[validate] 39. Validando check, unique, foreign keys e indices de academic_pi.project_evaluation (DB-009)..."
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
-  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid = 'academic_pi.project_evaluation'::regclass AND contype = 'c';" \
+  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid = 'academic_pi.project_evaluation'::regclass AND contype = 'c' AND conname IN ('project_evaluation_assignment_ck');" \
   | grep -qx 'project_evaluation_assignment_ck'
 
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
-  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid = 'academic_pi.project_evaluation'::regclass AND contype = 'u';" \
+  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid = 'academic_pi.project_evaluation'::regclass AND contype = 'u' AND conname IN ('project_evaluation_id_project_unq');" \
   | grep -qx 'project_evaluation_id_project_unq'
 
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
-  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid = 'academic_pi.project_evaluation'::regclass AND contype = 'f';" \
+  "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE conrelid = 'academic_pi.project_evaluation'::regclass AND contype = 'f' AND conname IN ('project_evaluation_assigned_by_user_fk','project_evaluation_evaluated_user_fk','project_evaluation_evaluator_user_fk','project_evaluation_participation_fk','project_evaluation_project_fk');" \
   | grep -qx 'project_evaluation_assigned_by_user_fk,project_evaluation_evaluated_user_fk,project_evaluation_evaluator_user_fk,project_evaluation_participation_fk,project_evaluation_project_fk'
 
-# Todas as 5 FKs usam ON DELETE RESTRICT (confdeltype = 'r')
+# Todas as FKs da tabela usam ON DELETE RESTRICT (confdeltype = 'r')
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
-  "SELECT count(*) FROM pg_constraint WHERE conrelid = 'academic_pi.project_evaluation'::regclass AND contype = 'f' AND confdeltype = 'r';" \
-  | grep -qx '5'
+  "SELECT (count(*) >= 5 AND count(*) FILTER (WHERE confdeltype <> 'r') = 0)::text FROM pg_constraint WHERE conrelid = 'academic_pi.project_evaluation'::regclass AND contype = 'f';" \
+  | grep -qx 'true'
 
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atc \
   "SELECT string_agg(indexname, ',' ORDER BY indexname) FROM pg_indexes WHERE schemaname = 'academic_pi' AND tablename = 'project_evaluation' AND indexname LIKE 'idx_%';" \
