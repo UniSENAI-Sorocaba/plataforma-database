@@ -18,7 +18,7 @@ Regras: `plataforma-governance/_KB/product/mvp-decisions-2026-11-21.md`, seção
 | Idempotência do seed 0006 (executado duas vezes, com triggers de guarda ativos) | Passou |
 | `validate_upgrade.sh`: upgrade V0001 até a última migration, idempotência de migrations e seeds, `validate.sh` no banco atualizado | Passou |
 | `detect_drift.sh` (dentro do upgrade): schemas de instalação limpa e de upgrade equivalentes | Passou ("Nenhum drift detectado") |
-| Teste de mutação: remover `project_impact_publication_ck` (versão anterior do modelo) | `validate.sh` falhou, como esperado |
+| Teste de mutação: remover `project_impact_approved_ck` (aprovação exige campos obrigatórios) | `validate.sh` falhou, como esperado |
 | Teste de mutação: visão pública sem filtro de aprovação | `validate.sh` falhou, como esperado |
 | Teste de mutação: remover o trigger `project_impact_guard_trg` | `validate.sh` falhou, como esperado |
 
@@ -26,7 +26,7 @@ Casos negativos do passo 40: estado inválido; aprovar rascunho incompleto; `app
 Casos positivos: rascunho parcial, aprovação completa visível com ODS, correção (sai de `approved`, edita, nova aprovação) que substitui o vigente, retirada imediata.
 
 ## Limitações
-- Execução local; o CI do GitHub roda no PR.
+- Execução local. O CI do GitHub (`CI Database`) passou no commit `5152cc9` do PR #60 (sobe banco limpo, migrations e validação de compatibilidade em 49 s).
 - Transições de estado, papel de coordenação como aprovador e separação entre declarante e aprovador são regras do Backend, não do banco.
 - Durante uma correção o impacto sai da consulta pública até a nova aprovação (sem tabela de versões não há como manter o antigo visível). Confirmação do PO pendente.
 - O Backend (`main`) usa um modelo diferente (tabelas `impact` e `impact_version`, estados em maiúsculas, `evidenceUrl`, ODS em array). Divergências em `docs/DB-015-impact-indicators.md`, seção 6.
