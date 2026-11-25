@@ -26,6 +26,7 @@ Para assegurar clareza, rastreabilidade e evitar colisões entre entidades, os s
 | **Sessão / Token (Session ID)** | `c0000000-0000-4000-8000-0000000000XX` | `c0000000-0000-4000-8000-000000000001` |
 | **Família de Rotação (Family ID)** | `d0000000-0000-4000-8000-0000000000XX` | `d0000000-0000-4000-8000-000000000001` |
 | **Avaliação Individual de Projeto (Evaluation ID)** | `d4000000-0000-4000-8000-0000000000XX` | `d4000000-0000-4000-8000-000000000001` |
+| **Atividade de Extensão (Extension Activity ID)** | `e1300000-0000-4000-8000-0000000000XX` | `e1300000-0000-4000-8000-000000000001` |
 
 ---
 
@@ -92,6 +93,16 @@ Para assegurar clareza, rastreabilidade e evitar colisões entre entidades, os s
     - aluno avaliando outro aluno (avaliação por pares em `PI` e `Extensão`);
     - múltiplas avaliações vinculadas a um mesmo projeto (cardinalidade variável).
 - **Conformidade Anti-PII:** Identificadores UUID constantes, e-mails `@synthetic.local` e datas fixas determinísticas, sem dados pessoais reais.
+
+### `0013_extension_activity.sql`
+- **Tabelas Alvo:** `extension.activity` (com participações sintéticas complementares aprovadas em `auth.user`, `institutional.academic_link` e `academic_pi.project_participation` para suporte a múltiplos participantes e projetos híbridos)
+- **Migration Mínima Exigida:** `V0013__create_extension_activities_hours.sql` (depende de `V0008__create_project_tables.sql` e `0005_project_tables.sql`)
+- **Cobertura de Domínios e Cenários:**
+  - `extension.activity`: 5 atividades determinísticas (`e1300000-0000-4000-8000-000000000001` a `...0005`) vinculadas a participações aprovadas em projetos com categoria `is_extension = true` (Extensão pura e Híbrido `PI + Extensão`), cobrindo:
+    - atividades com horas vigentes inteiras e fracionárias (`numeric` sem escala cristalizada) definidas e validadas pelo docente responsável do respectivo projeto (`last_validated_by` + `last_validated_at`);
+    - atividade enviada pelo aluno dentro do período do projeto aguardando definição/validação de horas pelo docente responsável (`validated_hours = NULL`);
+    - múltiplas atividades por participação e múltiplos participantes/docentes responsáveis.
+- **Conformidade Anti-PII:** Títulos, descrições, e-mails `@synthetic.local` e identificadores UUID constantes, sem dados pessoais reais.
 
 ---
 
